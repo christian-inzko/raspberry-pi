@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## First-time setup
+
+After cloning, activate the pre-commit credential check:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+The hook blocks commits containing hardcoded passwords, tokens, API keys, AWS keys, and private key headers. It allows `os.environ` and `os.getenv` reads through.
+
 ## Running tests
 
 Activate the Linux venv first (created at `.venv-linux/`):
