@@ -33,6 +33,35 @@ The pipeline requires one env var at runtime:
 | `DT_API_TOKEN` | Yes — exits on startup if unset | — |
 | `DT_METRIC_INGEST_URL` | No | Hardcoded Dynatrace sprint URL in source |
 
+## Testing on the Raspberry Pi
+
+The Pi is at `pi@10.0.0.3`. SSH requires the key at `~/.ssh/raspi_id_rsa`.
+
+**Copy and run a test version without replacing the running script:**
+
+```bash
+scp -i ~/.ssh/raspi_id_rsa rtl_433_pipeline_dynatrace.py pi@10.0.0.3:/home/pi/rtl_433_pipeline_dynatrace_v2.py
+ssh -i ~/.ssh/raspi_id_rsa pi@10.0.0.3 \
+  "timeout 90 bash -c 'DT_API_TOKEN=<token> python3 /home/pi/rtl_433_pipeline_dynatrace_v2.py'"
+```
+
+The token value is in the existing `/home/pi/rtl_433_pipeline_dynatrace.py` on the Pi (`dtToken = "..."`).
+
+**The RTL-SDR USB dongle can only be claimed by one process at a time.** If the original script is running, the new instance will start but `rtl_433` will fail with `usb_claim_interface error -6` and produce only empty lines (logged as `Invalid JSON: `). To test with live sensor data, stop the old process first:
+
+```bash
+ssh -i ~/.ssh/raspi_id_rsa pi@10.0.0.3 "pkill -f rtl_433_pipeline_dynatrace.py"
+```
+
+Restart the original afterwards:
+
+```bash
+ssh -i ~/.ssh/raspi_id_rsa pi@10.0.0.3 \
+  "nohup python3 /home/pi/rtl_433_pipeline_dynatrace.py >> /home/pi/rtl_433_pipeline_dynatrace.log 2>&1 &"
+```
+
+Live log on the Pi: `/home/pi/rtl_433_pipeline_dynatrace.log`
+
 ## Architecture
 
 `rtl_433_pipeline_dynatrace.py` is a single-file pipeline with three concurrent layers:
