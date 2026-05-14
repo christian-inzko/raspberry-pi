@@ -1,0 +1,36 @@
+#!/bin/bash
+# Blocks commits containing hardcoded credentials.
+# Reads staged content via `git show` so working-tree edits don't interfere.
+
+FAILED=0
+STAGED=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null)
+[ -z "$STAGED" ] && exit 0
+
+# ERE patterns (case-insensitive)
+CRED_ASSIGN=$'(password|passwd|secret|api_key|apikey|token|auth_key|credential)[[:space:]]*=[[:space:]]*["\']([^"\']{6,})["\']'
+AWS_KEY='AKIA[0-9A-Z]{16}'
+PRIV_KEY='-----BEGIN[[:space:]]+(RSA |OPENSSH |EC |PGP |DSA )?PRIVATE KEY'
+
+while IFS= read -r FILE; do
+    CONTENT=$(git show ":${FILE}" 2>/dev/null) || continue
+    echo "$CONTENT" | grep -qI "" || continue  # skip binary files
+
+    MATCHES=$(printf '%s' "$CONTENT" \
+        | grep -inE "$CRED_ASSIGN|$AWS_KEY|$PRIV_KEY" \
+        | grep -vE '(os\.environ|os\.getenv|environ\[)' \
+        | grep -vE '^[[:space:]]*(#|//)' \
+        || true)
+
+    if [ -n "$MATCHES" ]; then
+        echo "  BLOCKED  $FILE"
+        printf '%s\n' "$MATCHES" | sed 's/^/    /'
+        FAILED=1
+    fi
+done <<< "$STAGED"
+
+if [ "$FAILED" -ne 0 ]; then
+    printf '\nCommit blocked: hardcoded credentials detected.\n'
+    printf 'Use environment variables (e.g. os.environ["MY_SECRET"]) instead.\n'
+    printf 'To bypass (last resort): git commit --no-verify\n\n'
+    exit 1
+fi
