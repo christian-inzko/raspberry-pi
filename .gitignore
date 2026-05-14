@@ -1,0 +1,18 @@
+# Virtual environments
+.venv/
+.venv-linux/
+
+# IDE
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Docs
+docs/
+
+# Environment variables
+.env
