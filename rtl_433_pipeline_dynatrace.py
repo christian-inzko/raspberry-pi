@@ -1,30 +1,42 @@
 import os
-import schedule
-import time
-import requests, sys
-import subprocess
+import sys
 import json
-from json import JSONDecodeError
-from datetime import datetime
 import queue
+import logging
+import subprocess
 import threading
+import time
+from datetime import datetime, timezone
+from json import JSONDecodeError
+
+import requests
+import schedule
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+log = logging.getLogger(__name__)
 
 BUF_SIZE = 1000
 q = queue.Queue(BUF_SIZE)
 
-# REST settings
-dtMetricIngestUrl = os.environ.get("DT_METRIC_INGEST_URL", "https://rhp60717.sprint.dynatracelabs.com/api/v2/metrics/ingest")
-dtToken = os.environ.get("DT_API_TOKEN")
+dt_metric_ingest_url = os.environ.get(
+    "DT_METRIC_INGEST_URL",
+    "https://rhp60717.sprint.dynatracelabs.com/api/v2/metrics/ingest"
+)
+dt_token = os.environ.get("DT_API_TOKEN")
 
-def schedulerJob():
+
+def scheduler_job():
     timestamp = datetime.now()
-    print(f"SchedulerJob running at {timestamp}")
+    log.info(f"SchedulerJob running at {timestamp}")
     lines = []
-    while not q.empty():
-        line = q.get()
-        lines.append(line)
-    send_metric_ingest(dtMetricIngestUrl, dtToken, lines)
-    print(f"SchedulerJob finished at {timestamp} and has send {len(lines)} lines")
+    while True:
+        try:
+            lines.append(q.get_nowait())
+        except queue.Empty:
+            break
+    send_metric_ingest(dt_metric_ingest_url, dt_token, lines)
+    log.info(f"SchedulerJob finished at {timestamp} and has sent {len(lines)} lines")
+
 
 def run_continuously(interval=1):
     """Continuously run, while executing pending jobs at each elapsed
@@ -40,8 +52,7 @@ def run_continuously(interval=1):
     cease_continuous_run = threading.Event()
 
     class ScheduleThread(threading.Thread):
-        @classmethod
-        def run(cls):
+        def run(self):
             while not cease_continuous_run.is_set():
                 schedule.run_pending()
                 time.sleep(interval)
@@ -51,87 +62,78 @@ def run_continuously(interval=1):
     continuous_thread.start()
     return cease_continuous_run
 
+
 def send_metric_ingest(url, token, lines):
     # see https://www.dynatrace.com/support/help/dynatrace-api/environment-api/metric-v2/post-ingest-metrics/#example
-    apiToken = 'Api-Token ' + token
-    print(f"Sending metric ingest lines: {lines}")
-
-    body_metrics = '\n'.join(lines)+'\n'
-
+    api_token = 'Api-Token ' + token
+    body_metrics = '\n'.join(lines) + '\n'
     headers = {
-        'Authorization': apiToken,
+        'Authorization': api_token,
         'Content-Type': 'text/plain; charset=utf-8'
     }
     try:
-        print(f'Sending lines for metric ingest: {body_metrics}')
-        response_metrics = requests.post(url, headers=headers, data = body_metrics.encode('utf-8'))
-        print(f'metrics response status: {response_metrics.status_code},  data: {response_metrics.text}')
+        log.info(f'Sending lines for metric ingest: {body_metrics}')
+        response_metrics = requests.post(url, headers=headers, data=body_metrics.encode('utf-8'))
+        response_metrics.raise_for_status()
+        log.info(f'metrics response status: {response_metrics.status_code},  data: {response_metrics.text}')
     except requests.exceptions.RequestException as e:
-        print(f"HTTP error sending metric ingest lines: {e}")
-    return
+        log.error(f"HTTP error sending metric ingest lines: {e}")
 
-def get_epochtime_ms():
-    return int(round(time.time() * 1000))
 
+def _put_metric(metric_line):
+    if not q.full():
+        q.put(metric_line)
+    else:
+        log.warning(f"Queue full, dropping metric: {metric_line}")
 
 
 if __name__ == '__main__':
-    if not dtToken:
-        print("ERROR: DT_API_TOKEN environment variable is not set.", file=sys.stderr)
+    if not dt_token:
+        log.error("DT_API_TOKEN environment variable is not set.")
         sys.exit(1)
-    print("Pipeline process started")
-    proc = subprocess.Popen( ["/usr/local/bin/rtl_433", "-F","json"], stdout=subprocess.PIPE, universal_newlines=True )
+    log.info("Pipeline process started")
+    proc = subprocess.Popen(
+        ["/usr/local/bin/rtl_433", "-F", "json"],
+        stdout=subprocess.PIPE,
+        universal_newlines=True
+    )
 
-    schedule.every(1).minutes.do(schedulerJob)
-    cease_continuous_run  = run_continuously()
+    schedule.every(1).minutes.do(scheduler_job)
+    cease_continuous_run = run_continuously()
 
     try:
         while True:
             line = proc.stdout.readline()
-            # if not q.full():
-            #  q.put(line)
-
             try:
                 sensor_dict = json.loads(line)
-                # print(json.dumps(sensor_dict, indent=2))
-
                 # see metric ingest protocol: https://www.dynatrace.com/support/help/how-to-use-dynatrace/metrics/metric-ingestion/metric-ingestion-protocol/
                 # e.g. server.cpu.temperature,cpu.id=0 42
                 if 'model' in sensor_dict and 'channel' in sensor_dict and 'id' in sensor_dict and 'time' in sensor_dict:
-                    timestamp = sensor_dict["time"]
-                    parsed_timestamp = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
-                    utcMillisTS = int(parsed_timestamp.timestamp() * 1000)
+                    utc_millis_ts = int(datetime.now(timezone.utc).timestamp() * 1000)
 
                     if 'temperature_C' in sensor_dict and 'humidity' in sensor_dict:
-                        sensor_name = f"{sensor_dict['model']}_{sensor_dict['channel']}_{sensor_dict['id']}"
                         temperature = sensor_dict["temperature_C"]
                         humidity = sensor_dict["humidity"]
-                        # creating lines for schemaless metrics
-                        metricLine1 = f"thermometer.temperature,model={sensor_dict['model']},channel={sensor_dict['channel']},id={sensor_dict['id']} {temperature} {utcMillisTS}"
-                        metricLine2 = f"thermometer.humidity,model={sensor_dict['model']},channel={sensor_dict['channel']},id={sensor_dict['id']} {humidity} {utcMillisTS}"
-                        if not q.full():
-                            q.put(metricLine1)
-                        if not q.full():
-                            q.put(metricLine2)
+                        metric_line1 = f"thermometer.temperature,model={sensor_dict['model']},channel={sensor_dict['channel']},id={sensor_dict['id']} {temperature} {utc_millis_ts}"
+                        metric_line2 = f"thermometer.humidity,model={sensor_dict['model']},channel={sensor_dict['channel']},id={sensor_dict['id']} {humidity} {utc_millis_ts}"
+                        _put_metric(metric_line1)
+                        _put_metric(metric_line2)
 
-                    elif 'state' in sensor_dict and 'unit' in sensor_dict  and 'group' in sensor_dict:
-                        sensor_name = f"{sensor_dict['model']}_{sensor_dict['channel']}_{sensor_dict['id']}_{sensor_dict['group']}_{sensor_dict['unit']}"
-                        state = sensor_dict["state"]
-                        stateValue = 1 if state.upper() == "ON" else 0
-                        # send_custom_metric_infrared(dtThermometerUrl, dtToken, sensor_name, stateValue, timestamp)
-                        # creating lines for schemaless metrics
-                        metricLine = f"infraredsensor.detectionstatus,model={sensor_dict['model']},channel={sensor_dict['channel']},id={sensor_dict['id']},group={sensor_dict['group']},unit={sensor_dict['unit']} {stateValue} {utcMillisTS}"
-                        if not q.full():
-                            q.put(metricLine)
+                    elif 'state' in sensor_dict and 'unit' in sensor_dict and 'group' in sensor_dict:
+                        state_value = 1 if sensor_dict["state"].upper() == "ON" else 0
+                        metric_line = f"infraredsensor.detectionstatus,model={sensor_dict['model']},channel={sensor_dict['channel']},id={sensor_dict['id']},group={sensor_dict['group']},unit={sensor_dict['unit']} {state_value} {utc_millis_ts}"
+                        _put_metric(metric_line)
 
                     else:
-                        print(f"Unknown sensor type: {line}")
+                        log.warning(f"Unknown sensor type: {line}")
                 else:
-                    print(f"Wrong sensor data fields: {line}")
+                    log.warning(f"Wrong sensor data fields: {line}")
             except JSONDecodeError:
-                print(f"Invalid JSON: {line}")
+                log.warning(f"Invalid JSON: {line}")
     except KeyboardInterrupt:
-        print("Pipeline process interrupted!")
+        log.info("Pipeline process interrupted!")
+    finally:
+        proc.terminate()
+        cease_continuous_run.set()
 
-    cease_continuous_run.set()
-print("Pipeline process finished")
+    log.info("Pipeline process finished")

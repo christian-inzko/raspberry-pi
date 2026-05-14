@@ -1,15 +1,10 @@
 """
 Tests for rtl_433_pipeline_dynatrace.py
-
-Run against the CURRENT (unrefactored) code to establish a baseline.
-Tests are annotated with [BUG] where they document a known defect —
-those assertions will need updating after the corresponding fix is applied.
 """
 
-import io
 import queue
-import sys
-from datetime import datetime
+import logging
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -44,14 +39,12 @@ def _parse_sensor(sensor_dict):
     """
     Mirrors the metric-line-building logic currently inside __main__.
     Returns (lines: list[str], dropped: bool) where dropped=True means
-    the 'else' / missing-fields branch was taken.
+    the missing-fields branch was taken.
     """
     if not all(k in sensor_dict for k in ("model", "channel", "id", "time")):
         return [], True
 
-    timestamp = sensor_dict["time"]
-    parsed_timestamp = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
-    utcMillisTS = int(parsed_timestamp.timestamp() * 1000)
+    utc_millis_ts = int(datetime.now(timezone.utc).timestamp() * 1000)
 
     lines = []
     if "temperature_C" in sensor_dict and "humidity" in sensor_dict:
@@ -61,25 +54,25 @@ def _parse_sensor(sensor_dict):
             f"thermometer.temperature,"
             f"model={sensor_dict['model']},"
             f"channel={sensor_dict['channel']},"
-            f"id={sensor_dict['id']} {t} {utcMillisTS}"
+            f"id={sensor_dict['id']} {t} {utc_millis_ts}"
         )
         lines.append(
             f"thermometer.humidity,"
             f"model={sensor_dict['model']},"
             f"channel={sensor_dict['channel']},"
-            f"id={sensor_dict['id']} {h} {utcMillisTS}"
+            f"id={sensor_dict['id']} {h} {utc_millis_ts}"
         )
     elif ("state" in sensor_dict
           and "unit" in sensor_dict
           and "group" in sensor_dict):
-        stateValue = 1 if sensor_dict["state"].upper() == "ON" else 0
+        state_value = 1 if sensor_dict["state"].upper() == "ON" else 0
         lines.append(
             f"infraredsensor.detectionstatus,"
             f"model={sensor_dict['model']},"
             f"channel={sensor_dict['channel']},"
             f"id={sensor_dict['id']},"
             f"group={sensor_dict['group']},"
-            f"unit={sensor_dict['unit']} {stateValue} {utcMillisTS}"
+            f"unit={sensor_dict['unit']} {state_value} {utc_millis_ts}"
         )
     else:
         return [], False  # unknown sensor type — nothing queued
@@ -129,9 +122,14 @@ class TestSendMetricIngest:
             assert isinstance(body, bytes)
 
     def test_handles_network_error_without_crash(self):
-        """[BUG] bare except currently swallows ConnectionError — this test documents that behaviour."""
         with patch("requests.post", side_effect=requests.exceptions.ConnectionError("down")):
-            # must not raise
+            pipeline.send_metric_ingest("https://x.com", "t", ["line"])
+
+    def test_http_error_does_not_crash(self):
+        """4xx/5xx response is caught and logged rather than crashing."""
+        mock_response = MagicMock(status_code=403, text="Forbidden")
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("403")
+        with patch("requests.post", return_value=mock_response):
             pipeline.send_metric_ingest("https://x.com", "t", ["line"])
 
     def test_empty_lines_list(self):
@@ -144,13 +142,12 @@ class TestSendMetricIngest:
 
 
 # ---------------------------------------------------------------------------
-# schedulerJob
+# scheduler_job
 # ---------------------------------------------------------------------------
 
 class TestSchedulerJob:
 
     def setup_method(self):
-        # drain queue before each test
         while not pipeline.q.empty():
             pipeline.q.get_nowait()
 
@@ -162,7 +159,7 @@ class TestSchedulerJob:
         captured = []
         with patch.object(pipeline, "send_metric_ingest",
                           side_effect=lambda url, tok, lines: captured.extend(lines)):
-            pipeline.schedulerJob()
+            pipeline.scheduler_job()
 
         assert captured == ["metric.a 1 1000", "metric.b 2 2000", "metric.c 3 3000"]
         assert pipeline.q.empty()
@@ -171,7 +168,7 @@ class TestSchedulerJob:
         captured = []
         with patch.object(pipeline, "send_metric_ingest",
                           side_effect=lambda url, tok, lines: captured.extend(lines)):
-            pipeline.schedulerJob()
+            pipeline.scheduler_job()
 
         assert captured == []
 
@@ -180,28 +177,10 @@ class TestSchedulerJob:
         calls = []
         with patch.object(pipeline, "send_metric_ingest",
                           side_effect=lambda url, tok, lines: calls.append((url, tok))):
-            pipeline.schedulerJob()
+            pipeline.scheduler_job()
 
-        assert calls[0][0] == pipeline.dtMetricIngestUrl
-        assert calls[0][1] == pipeline.dtToken
-
-
-# ---------------------------------------------------------------------------
-# get_epochtime_ms  (currently unused but present in module)
-# ---------------------------------------------------------------------------
-
-class TestGetEpochtimeMs:
-
-    def test_returns_integer(self):
-        result = pipeline.get_epochtime_ms()
-        assert isinstance(result, int)
-
-    def test_returns_milliseconds_scale(self):
-        import time
-        result = pipeline.get_epochtime_ms()
-        # should be within 5 seconds of now in ms
-        now_ms = int(time.time() * 1000)
-        assert abs(result - now_ms) < 5000
+        assert calls[0][0] == pipeline.dt_metric_ingest_url
+        assert calls[0][1] == pipeline.dt_token
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +211,6 @@ class TestTemperatureMetricLine:
 
     def test_temperature_value(self):
         lines, _ = _parse_sensor(_make_thermo_dict(temp=18.3))
-        # value field is the second space-separated token
         parts = lines[0].split(" ")
         assert float(parts[1]) == pytest.approx(18.3)
 
@@ -242,7 +220,7 @@ class TestTemperatureMetricLine:
         assert float(parts[1]) == pytest.approx(72)
 
     def test_timestamp_is_epoch_ms(self):
-        lines, _ = _parse_sensor(_make_thermo_dict(time="2026-05-14 10:00:00"))
+        lines, _ = _parse_sensor(_make_thermo_dict())
         ts_ms = int(lines[0].split(" ")[-1])
         assert ts_ms > 1_000_000_000_000  # sensible ms epoch
 
@@ -284,7 +262,7 @@ class TestIRSensorMetricLine:
 
 
 # ---------------------------------------------------------------------------
-# Edge cases and documented bugs
+# Edge cases
 # ---------------------------------------------------------------------------
 
 class TestMissingAndUnknownSensors:
@@ -303,26 +281,32 @@ class TestMissingAndUnknownSensors:
         }
         lines, dropped = _parse_sensor(unknown)
         assert lines == []
-        assert dropped is False  # reached else branch, not missing-fields branch
+        assert dropped is False
 
 
-class TestKnownBugs:
+# ---------------------------------------------------------------------------
+# Queue drop warning
+# ---------------------------------------------------------------------------
 
-    def test_queue_full_silently_drops_metric(self):
-        """
-        [BUG] When the queue is full, metrics are dropped with no warning logged.
-        """
-        # Fill the queue to capacity
-        full_q = queue.Queue(3)
-        for i in range(3):
-            full_q.put(f"metric {i}")
+class TestQueueDrop:
 
-        # Simulate the source's guard: `if not q.full(): q.put(...)`
-        dropped = False
-        if not full_q.full():
-            full_q.put("overflow metric")
-        else:
-            dropped = True
+    def test_queue_full_logs_warning(self, caplog):
+        """Full queue now logs a WARNING instead of silently dropping."""
+        full_q = queue.Queue(1)
+        full_q.put("existing_metric 0 1000")
 
-        assert dropped is True
-        assert full_q.qsize() == 3  # overflow was silently discarded
+        with patch.object(pipeline, 'q', full_q):
+            with caplog.at_level(logging.WARNING):
+                pipeline._put_metric("overflow_metric 1 2000")
+
+        assert "Queue full" in caplog.text
+        assert full_q.qsize() == 1  # overflow was not added
+
+    def test_queue_not_full_puts_metric(self):
+        empty_q = queue.Queue(10)
+
+        with patch.object(pipeline, 'q', empty_q):
+            pipeline._put_metric("metric 1 1000")
+
+        assert empty_q.qsize() == 1
+        assert empty_q.get_nowait() == "metric 1 1000"

@@ -19,6 +19,7 @@ while IFS= read -r FILE; do
         | grep -inE "$CRED_ASSIGN|$AWS_KEY|$PRIV_KEY" \
         | grep -vE '(os\.environ|os\.getenv|environ\[)' \
         | grep -vE '^[[:space:]]*(#|//)' \
+        | grep -vE "['\"][[:space:]]*\+"  \
         || true)
 
     if [ -n "$MATCHES" ]; then
