@@ -114,6 +114,14 @@ ssh -i ~/.ssh/raspi_id_rsa pi@10.0.0.3 \
 
 ### Service management
 
+The service is enabled at boot via systemd (the `.deb` installer created the symlink automatically):
+
+```
+/etc/systemd/system/multi-user.target.wants/otelcol-contrib.service
+```
+
+No crontab entry is needed. On reboot the service starts automatically, picks up `DT_API_TOKEN` from `/etc/otelcol-contrib/otelcol-contrib.conf`, and begins shipping metrics within a few seconds.
+
 ```bash
 # Status / logs
 ssh -i ~/.ssh/raspi_id_rsa pi@10.0.0.3 "sudo systemctl status otelcol-contrib"
