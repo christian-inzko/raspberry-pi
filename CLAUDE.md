@@ -64,6 +64,14 @@ The token value is in `/etc/otelcol-contrib/otelcol-contrib.conf` on the Pi (`DT
 
 Live log on the Pi: `/home/pi/rtl_433_pipeline_dynatrace.log`
 
+**Auto-start on reboot:** the Pi's crontab (`crontab -e` as the `pi` user) has an `@reboot` entry that starts the pipeline automatically:
+
+```
+@reboot DT_API_TOKEN=<token> python3 /home/pi/rtl_433_pipeline_dynatrace.py > /home/pi/rtl_433_pipeline_dynatrace.log 2>&1
+```
+
+The `>` truncates the log on each reboot (intentional — gives a clean log per boot session).
+
 ## OTel host metrics (Pi → Dynatrace)
 
 The Pi runs `otelcol-contrib` as a systemd service to ship host metrics (CPU load, memory, disk, filesystem, network) to Dynatrace alongside the sensor pipeline. The two processes are completely independent.
