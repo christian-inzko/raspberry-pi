@@ -1,0 +1,181 @@
+id: 7f16613e-5aff-4a73-b448-ff66b7758efb
+name: Raspberry metrics
+type: dashboard
+owner: 777f6e4b-adba-4c42-b132-74a008ff71c9
+isPrivate: true
+content:
+  annotations: []
+  importedWithCode: false
+  settings:
+    defaultTimeframe:
+      enabled: true
+      value:
+        from: now()-24h
+        to: now()
+  layouts:
+    "0":
+      h: 6
+      w: 10
+      x: 0
+      "y": 0
+    "1":
+      h: 6
+      w: 12
+      x: 10
+      "y": 0
+    "2":
+      h: 6
+      w: 8
+      x: 0
+      "y": 6
+    "3":
+      h: 6
+      w: 8
+      x: 8
+      "y": 6
+    "4":
+      h: 6
+      w: 8
+      x: 16
+      "y": 6
+  tiles:
+    "0":
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries { avg(thermometer.temperature), value.A = avg(thermometer.temperature, scalar: true) }, by: { channel, model, id }'
+      queryConfig:
+        subQueries:
+          - by:
+              - channel
+              - model
+              - id
+            convertToValue: Avg
+            datatype: metrics
+            id: A
+            isEnabled: true
+            metric:
+              aggregation: avg
+              key: thermometer.temperature
+        version: 20
+      querySettings:
+        defaultSamplingRatio: 10
+        defaultScanLimitGbytes: 500
+        enableSampling: false
+        maxResultMegaBytes: 1
+        maxResultRecords: 1000
+      subType: dql-builder-metrics
+      title: Temperature
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: true
+    "1":
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries { avg(thermometer.humidity), value.A = avg(thermometer.humidity, scalar: true) }, by: { channel, model, id }'
+      queryConfig:
+        subQueries:
+          - by:
+              - channel
+              - model
+              - id
+            convertToValue: Avg
+            datatype: metrics
+            id: A
+            isEnabled: true
+            metric:
+              aggregation: avg
+              key: thermometer.humidity
+        version: 20
+      querySettings:
+        defaultSamplingRatio: 10
+        defaultScanLimitGbytes: 500
+        enableSampling: false
+        maxResultMegaBytes: 1
+        maxResultRecords: 1000
+      subType: dql-builder-metrics
+      title: Humidity
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: true
+    "2":
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: |
+        timeseries {
+          load1m = avg(pi.cpu.load_1m),
+          load5m = avg(pi.cpu.load_5m),
+          load15m = avg(pi.cpu.load_15m)
+        }
+      title: CPU Load Average
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        lineChart:
+          legend:
+            showLegend: true
+    "3":
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: |
+        timeseries {
+          used = avg(system.memory.usage, filter: {state == "used"}),
+          free = avg(system.memory.usage, filter: {state == "free"}),
+          cached = avg(system.memory.usage, filter: {state == "cached"}),
+          buffered = avg(system.memory.usage, filter: {state == "buffered"})
+        }
+        | fieldsAdd total = arrayLast(used) + arrayLast(free) + arrayLast(cached) + arrayLast(buffered)
+        | fieldsAdd used_pct = arrayLast(used) * 100 / total
+        | fields used_pct
+      title: Memory Used
+      type: data
+      visualization: singleValue
+      visualizationSettings:
+        autoSelectVisualization: false
+        singleValue:
+          showLabel: true
+          label: "% used"
+          recordField: used_pct
+      coloring:
+        colorRules:
+          - { colorMode: custom-color, comparator: ">", customColor: { Default: "#2f6862" }, field: used_pct, value: -1 }
+          - { colorMode: custom-color, comparator: ">", customColor: { Default: "#eea53c" }, field: used_pct, value: 80 }
+          - { colorMode: custom-color, comparator: ">", customColor: { Default: "#c62239" }, field: used_pct, value: 90 }
+    "4":
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: |
+        timeseries {
+          used = avg(system.filesystem.usage, filter: {state == "used" and mountpoint == "/"}),
+          free = avg(system.filesystem.usage, filter: {state == "free" and mountpoint == "/"})
+        }
+        | fieldsAdd used_pct = arrayLast(used) * 100 / (arrayLast(used) + arrayLast(free))
+        | fields used_pct
+      title: Disk Used /
+      type: data
+      visualization: singleValue
+      visualizationSettings:
+        autoSelectVisualization: false
+        singleValue:
+          showLabel: true
+          label: "% used"
+          recordField: used_pct
+      coloring:
+        colorRules:
+          - { colorMode: custom-color, comparator: ">", customColor: { Default: "#2f6862" }, field: used_pct, value: -1 }
+          - { colorMode: custom-color, comparator: ">", customColor: { Default: "#eea53c" }, field: used_pct, value: 80 }
+          - { colorMode: custom-color, comparator: ">", customColor: { Default: "#c62239" }, field: used_pct, value: 90 }
+  variables: []
+  version: 21
