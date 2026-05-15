@@ -57,8 +57,10 @@ Restart the original afterwards:
 
 ```bash
 ssh -i ~/.ssh/raspi_id_rsa pi@10.0.0.3 \
-  "nohup python3 /home/pi/rtl_433_pipeline_dynatrace.py >> /home/pi/rtl_433_pipeline_dynatrace.log 2>&1 &"
+  "nohup bash -c 'DT_API_TOKEN=<token> python3 /home/pi/rtl_433_pipeline_dynatrace.py >> /home/pi/rtl_433_pipeline_dynatrace.log 2>&1' &"
 ```
+
+The token value is in `/etc/otelcol-contrib/otelcol-contrib.conf` on the Pi (`DT_API_TOKEN=...`).
 
 Live log on the Pi: `/home/pi/rtl_433_pipeline_dynatrace.log`
 
