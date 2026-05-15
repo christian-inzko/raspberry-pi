@@ -1,0 +1,43 @@
+receivers:
+  host_metrics:
+    collection_interval: 60s
+    scrapers:
+      cpu:
+      memory:
+      disk:
+      filesystem:
+        exclude_mount_points:
+          mount_points: [/dev, /dev/shm, /run, /run/lock, /sys, /proc]
+          match_type: strict
+        exclude_fs_types:
+          fs_types: [tmpfs, devtmpfs, sysfs, proc, cgroup, cgroup2]
+          match_type: strict
+      network:
+      load:
+
+processors:
+  batch:
+  metrics_transform:
+    transforms:
+      - include: system.cpu.load_average.1m
+        action: update
+        new_name: pi.cpu.load_1m
+      - include: system.cpu.load_average.5m
+        action: update
+        new_name: pi.cpu.load_5m
+      - include: system.cpu.load_average.15m
+        action: update
+        new_name: pi.cpu.load_15m
+
+exporters:
+  otlp_http:
+    metrics_endpoint: https://rhp60717.sprint.dynatracelabs.com/api/v2/otlp/v1/metrics
+    headers:
+      Authorization: "Api-Token ${env:DT_API_TOKEN}"
+
+service:
+  pipelines:
+    metrics:
+      receivers: [host_metrics]
+      processors: [batch, metrics_transform]
+      exporters: [otlp_http]

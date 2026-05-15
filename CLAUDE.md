@@ -62,6 +62,72 @@ ssh -i ~/.ssh/raspi_id_rsa pi@10.0.0.3 \
 
 Live log on the Pi: `/home/pi/rtl_433_pipeline_dynatrace.log`
 
+## OTel host metrics (Pi → Dynatrace)
+
+The Pi runs `otelcol-contrib` as a systemd service to ship host metrics (CPU load, memory, disk, filesystem, network) to Dynatrace alongside the sensor pipeline. The two processes are completely independent.
+
+### Installation (one-time)
+
+The Pi is 32-bit ARMv7 (Raspbian 10). OneAgent does not support this architecture; the OTel collector does.
+
+```bash
+# Download and install the armv7 .deb (check https://github.com/open-telemetry/opentelemetry-collector-releases/releases for latest)
+wget https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.152.0/otelcol-contrib_0.152.0_linux_armv7.deb -O /tmp/otelcol-contrib.deb
+sudo dpkg -i /tmp/otelcol-contrib.deb
+```
+
+The `.deb` creates the systemd service and config directory automatically.
+
+### Config files on the Pi
+
+| File | Purpose |
+|---|---|
+| `/etc/otelcol-contrib/config.yaml` | Collector pipeline config — copy of `otel/config.yaml` in this repo |
+| `/etc/otelcol-contrib/otelcol-contrib.conf` | Systemd env file — holds `DT_API_TOKEN` and `OTELCOL_OPTIONS` |
+
+The env file is not in version control (contains the token). Its contents:
+
+```
+OTELCOL_OPTIONS="--config=/etc/otelcol-contrib/config.yaml"
+DT_API_TOKEN=<token>
+```
+
+Permissions on the env file: `root:otelcol-contrib 640`.
+
+### Deploying a config change
+
+```bash
+scp -i ~/.ssh/raspi_id_rsa otel/config.yaml pi@10.0.0.3:/tmp/otelcol-contrib-config.yaml
+ssh -i ~/.ssh/raspi_id_rsa pi@10.0.0.3 \
+  "sudo cp /tmp/otelcol-contrib-config.yaml /etc/otelcol-contrib/config.yaml && sudo systemctl restart otelcol-contrib"
+```
+
+### Service management
+
+```bash
+# Status / logs
+ssh -i ~/.ssh/raspi_id_rsa pi@10.0.0.3 "sudo systemctl status otelcol-contrib"
+ssh -i ~/.ssh/raspi_id_rsa pi@10.0.0.3 "sudo journalctl -u otelcol-contrib -n 50 --no-pager"
+```
+
+### Metrics collected
+
+Collection interval: 60 s. Metrics land in the Dynatrace sprint environment under the `opentelemetry` source.
+
+| Metric | Notes |
+|---|---|
+| `pi.cpu.load_1m` / `pi.cpu.load_5m` / `pi.cpu.load_15m` | Renamed from `system.cpu.load_average.*` — Dynatrace adds quotes around digit-starting suffixes (`"1m"`) which DQL cannot reference |
+| `system.memory.usage` | Gauge, split by `state` (used / free / cached / buffered / slab_*) |
+| `system.filesystem.usage` | Gauge, split by `mountpoint` and `state` (used / free / reserved) |
+| `system.disk.pending_operations` | Gauge |
+| `system.network.connections` | Gauge |
+
+**Known limitation:** monotonic cumulative sum metrics (`system.cpu.time`, `system.disk.io`, `system.network.io`, `system.network.dropped`) are rejected by the Dynatrace OTLP endpoint with `UNSUPPORTED_METRIC_TYPE_MONOTONIC_CUMULATIVE_SUM`. Adding a `cumulativetodelta` processor would fix this but has not been done yet.
+
+### Dynatrace dashboard
+
+The "Raspberry metrics" dashboard (`7f16613e-5aff-4a73-b448-ff66b7758efb`) shows all sensor and host metrics. Row 1: temperature and humidity. Row 2: CPU load average (line chart), memory % used (single value), disk % used (single value).
+
 ## Architecture
 
 `rtl_433_pipeline_dynatrace.py` is a single-file pipeline with three concurrent layers:
