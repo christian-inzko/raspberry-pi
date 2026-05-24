@@ -1,0 +1,108 @@
+content:
+  annotations: []
+  importedWithCode: false
+  layouts:
+    "0":
+      h: 9
+      w: 24
+      x: 0
+      "y": 0
+    "1":
+      h: 6
+      w: 12
+      x: 0
+      "y": 9
+    "2":
+      h: 6
+      w: 6
+      x: 12
+      "y": 9
+    "3":
+      h: 6
+      w: 6
+      x: 18
+      "y": 9
+  settings:
+    defaultTimeframe:
+      enabled: true
+      value:
+        from: now()-24h
+        to: now()
+  tiles:
+    "0":
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: |
+        timeseries {
+          pv_yield = avg(sungrow_total_dc_power),
+          grid = avg(sungrow_meter_active_power),
+          battery = avg(sungrow_battery_power),
+          load = avg(sungrow_load_power)
+        }
+      title: Power (W)
+      type: data
+      visualization: areaChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    "1":
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: |
+        timeseries avg(sungrow_battery_level)
+      title: Battery Level (%)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+    "2":
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: |
+        timeseries soc = avg(sungrow_battery_level)
+        | fieldsAdd current = arrayLast(soc)
+        | fields current
+      title: Battery Level
+      type: data
+      visualization: singleValue
+      visualizationSettings:
+        autoSelectVisualization: false
+        singleValue:
+          label: '% charged'
+          recordField: current
+    "3":
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: |
+        timeseries temp = avg(sungrow_inverter_temperature)
+        | fieldsAdd current = arrayLast(temp)
+        | fields current
+      title: Inverter Temperature
+      type: data
+      visualization: singleValue
+      visualizationSettings:
+        autoSelectVisualization: false
+        singleValue:
+          label: °C
+          recordField: current
+  variables: []
+  version: 21
+id: 751301dc-6ef3-4af6-a9a0-efc7131d5ba1
+isPrivate: true
+modificationInfo:
+  createdTime: 2026-05-23T20:39:49.078Z
+  lastModifiedTime: 2026-05-23T20:40:26.217Z
+name: Sungrow metrics
+owner: 777f6e4b-adba-4c42-b132-74a008ff71c9
+type: dashboard
+version: 2
