@@ -15,8 +15,32 @@ receivers:
       network:
       load:
 
+  prometheus/homeassistant:
+    config:
+      scrape_configs:
+        - job_name: homeassistant
+          scrape_interval: 60s
+          metrics_path: /api/prometheus
+          authorization:
+            credentials: ${env:HA_API_TOKEN}
+          static_configs:
+            - targets:
+                - 192.168.86.211:8123
+
+  filelog:
+    include:
+      - /home/pi/rtl_433_pipeline_dynatrace.log
+      - /home/pi/sungrow_read.log
+    start_at: end
+
 processors:
   batch:
+  resource:
+    attributes:
+      - key: host.name
+        value: "raspberrypi"
+        action: upsert
+  cumulativetodelta:
   metrics_transform:
     transforms:
       - include: system.cpu.load_average.1m
@@ -32,12 +56,17 @@ processors:
 exporters:
   otlp_http:
     metrics_endpoint: https://rhp60717.sprint.dynatracelabs.com/api/v2/otlp/v1/metrics
+    logs_endpoint: https://rhp60717.sprint.dynatracelabs.com/api/v2/otlp/v1/logs
     headers:
       Authorization: "Api-Token ${env:DT_API_TOKEN}"
 
 service:
   pipelines:
     metrics:
-      receivers: [host_metrics]
-      processors: [batch, metrics_transform]
+      receivers: [host_metrics, prometheus/homeassistant]
+      processors: [resource, batch, cumulativetodelta, metrics_transform]
+      exporters: [otlp_http]
+    logs:
+      receivers: [filelog]
+      processors: [batch]
       exporters: [otlp_http]

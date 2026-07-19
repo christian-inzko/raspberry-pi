@@ -93,13 +93,14 @@ The `.deb` creates the systemd service and config directory automatically.
 | File | Purpose |
 |---|---|
 | `/etc/otelcol-contrib/config.yaml` | Collector pipeline config — copy of `otel/config.yaml` in this repo |
-| `/etc/otelcol-contrib/otelcol-contrib.conf` | Systemd env file — holds `DT_API_TOKEN` and `OTELCOL_OPTIONS` |
+| `/etc/otelcol-contrib/otelcol-contrib.conf` | Systemd env file — holds `DT_API_TOKEN`, `HA_API_TOKEN`, and `OTELCOL_OPTIONS` |
 
-The env file is not in version control (contains the token). Its contents:
+The env file is not in version control (contains the tokens). Its contents:
 
 ```
 OTELCOL_OPTIONS="--config=/etc/otelcol-contrib/config.yaml"
 DT_API_TOKEN=<token>
+HA_API_TOKEN=<home assistant long-lived access token>
 ```
 
 Permissions on the env file: `root:otelcol-contrib 640`.
@@ -140,7 +141,42 @@ Collection interval: 60 s. Metrics land in the Dynatrace sprint environment unde
 | `system.disk.pending_operations` | Gauge |
 | `system.network.connections` | Gauge |
 
-**Known limitation:** monotonic cumulative sum metrics (`system.cpu.time`, `system.disk.io`, `system.network.io`, `system.network.dropped`) are rejected by the Dynatrace OTLP endpoint with `UNSUPPORTED_METRIC_TYPE_MONOTONIC_CUMULATIVE_SUM`. Adding a `cumulativetodelta` processor would fix this but has not been done yet.
+Monotonic cumulative sum metrics (`system.cpu.time`, `system.disk.io`, `system.disk.io_time`, `system.network.io`, `system.network.dropped`, `system.network.errors`, and others) are rejected outright by the Dynatrace OTLP endpoint (`UNSUPPORTED_METRIC_TYPE_MONOTONIC_CUMULATIVE_SUM`) unless converted first. The `cumulativetodelta` processor in the metrics pipeline runs with no `include` filter — it converts every cumulative sum metric globally — because the `host_metrics` receiver emits more of these than any static list reliably enumerates (three showed up during testing beyond the four originally identified).
+
+A `resource` processor stamps `host.name: raspberrypi` on every metric so a Smartscape host entity forms and host-level anomaly detection is available.
+
+### Logs (Pi → Dynatrace)
+
+The `filelog` receiver tails `/home/pi/rtl_433_pipeline_dynatrace.log` and `/home/pi/sungrow_read.log` (`start_at: end`, so only new lines after collector startup are shipped) and forwards them through the `otlp_http` exporter's `logs_endpoint`. This surfaces pipeline errors (e.g. the `usb_claim_interface error -6` USB-conflict case documented above) without SSHing into the Pi.
+
+`DT_API_TOKEN` needs the `logs.ingest` scope added (in addition to `metrics.ingest`) for this pipeline to authenticate — check the token's scopes in Dynatrace before deploying this config.
+
+### Home Assistant PV metrics receiver
+
+The `prometheus/homeassistant` receiver in `otel/config.yaml` scrapes PV-system metrics from a second Raspberry Pi 4 (`192.168.86.211`) running Home Assistant, which itself reads a Sungrow SH8.0RT-20 inverter (WiNet-S dongle, `192.168.86.26`) over Modbus TCP. This is separate from and complementary to `sungrow_read.py` (which reads a different inverter directly via Modbus TCP and cron, see below) — this receiver instead scrapes HA's built-in Prometheus exporter for the daily/cumulative energy sensors HA already tracks.
+
+The collector (running on `pi@10.0.0.3`, alongside `host_metrics`) reaches out over the LAN to `192.168.86.211:8123/api/prometheus` every 60 s, authenticating with a bearer token (`HA_API_TOKEN`).
+
+**Prerequisites (manual, one-time, on the Home Assistant Pi — not this repo):**
+- Enable the **Prometheus** integration/add-on in Home Assistant (Settings → Devices & Services → Add Integration → Prometheus).
+- Create a **Long-Lived Access Token** for the collector (HA profile page → Long-Lived Access Tokens).
+- Add the token as `HA_API_TOKEN=<token>` to `/etc/otelcol-contrib/otelcol-contrib.conf` on `pi@10.0.0.3` (same file/pattern as `DT_API_TOKEN`, see above).
+- Deploy the updated `otel/config.yaml` (see "Deploying a config change" above) and restart `otelcol-contrib`.
+
+**Metrics exposed by HA's Prometheus integration** (entity IDs on the HA Pi):
+
+| Entity | Description | Unit |
+|---|---|---|
+| `sensor.daily_pv_generation` | Daily PV yield | kWh |
+| `sensor.daily_exported_energy` | Daily grid export | kWh |
+| `sensor.daily_imported_energy` | Daily grid import | kWh |
+| `sensor.daily_battery_charge` | Daily battery charge | kWh |
+| `sensor.daily_battery_discharge` | Daily battery discharge | kWh |
+| `sensor.battery_level` | Battery state of charge | % |
+| `sensor.total_dc_power` | Current PV power | W |
+| `sensor.export_power` | Current grid export power | W |
+
+HA's Prometheus exporter names metrics by domain/unit (e.g. `homeassistant_sensor_energy_kwh`) with the entity id as a label — check the actual metric/label names against a live scrape (`curl -H "Authorization: Bearer $HA_API_TOKEN" http://192.168.86.211:8123/api/prometheus`) before building Dynatrace dashboard queries, since HA does not use the literal entity names as metric names.
 
 ### Dynatrace dashboard
 
