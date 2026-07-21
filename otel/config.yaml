@@ -47,6 +47,17 @@ processors:
         host.mac: {enabled: true}
         os.type: {enabled: true}
         os.description: {enabled: true}
+  resource/homeassistant:
+    attributes:
+      - key: host.name
+        value: "homeassistant"
+        action: upsert
+      - key: host.id
+        value: "homeassistant-192-168-86-211"
+        action: upsert
+      - key: host.ip
+        value: "192.168.86.211"
+        action: upsert
   cumulativetodelta:
     max_staleness: 25h
   metrics_transform:
@@ -70,9 +81,13 @@ exporters:
 
 service:
   pipelines:
-    metrics:
-      receivers: [host_metrics, prometheus/homeassistant]
+    metrics/host:
+      receivers: [host_metrics]
       processors: [resourcedetection, batch, cumulativetodelta, metrics_transform]
+      exporters: [otlp_http]
+    metrics/homeassistant:
+      receivers: [prometheus/homeassistant]
+      processors: [resource/homeassistant, batch, cumulativetodelta]
       exporters: [otlp_http]
     logs:
       receivers: [filelog]
