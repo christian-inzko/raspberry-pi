@@ -35,12 +35,19 @@ receivers:
 
 processors:
   batch:
-  resource:
-    attributes:
-      - key: host.name
-        value: "raspberrypi"
-        action: upsert
+  resourcedetection:
+    detectors: ["system"]
+    system:
+      resource_attributes:
+        host.arch: {enabled: true}
+        host.id: {enabled: true}
+        host.name: {enabled: true}
+        host.ip: {enabled: true}
+        host.mac: {enabled: true}
+        os.type: {enabled: true}
+        os.description: {enabled: true}
   cumulativetodelta:
+    max_staleness: 25h
   metrics_transform:
     transforms:
       - include: system.cpu.load_average.1m
@@ -64,9 +71,9 @@ service:
   pipelines:
     metrics:
       receivers: [host_metrics, prometheus/homeassistant]
-      processors: [resource, batch, cumulativetodelta, metrics_transform]
+      processors: [resourcedetection, batch, cumulativetodelta, metrics_transform]
       exporters: [otlp_http]
     logs:
       receivers: [filelog]
-      processors: [batch]
+      processors: [resourcedetection, batch]
       exporters: [otlp_http]
