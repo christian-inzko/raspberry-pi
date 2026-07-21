@@ -157,6 +157,8 @@ The `prometheus/homeassistant` receiver in `otel/config.yaml` scrapes PV-system 
 
 The collector (running on `pi@10.0.0.3`, alongside `host_metrics`) reaches out over the LAN to `192.168.86.211:8123/api/prometheus` every 60 s, authenticating with a bearer token (`HA_API_TOKEN`).
 
+**Known issue:** this scrape crosses onto the Pi's WiFi-connected subnet (`192.168.86.0/24`, separate from its primary `10.0.0.3` management network) to reach the HA Pi, and is prone to intermittent failures (`Failed to scrape Prometheus endpoint` in the collector logs) — a real scrape timeout, not a config bug, most likely from WiFi flakiness. The `scrape_timeout: 30s` setting (vs. the Prometheus default of 10s) mitigates this; if failures reappear at a meaningful rate, that's the first thing to check/increase.
+
 **Prerequisites (manual, one-time, on the Home Assistant Pi — not this repo):**
 - Enable the **Prometheus** integration/add-on in Home Assistant (Settings → Devices & Services → Add Integration → Prometheus).
 - Create a **Long-Lived Access Token** for the collector (HA profile page → Long-Lived Access Tokens).
