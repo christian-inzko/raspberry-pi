@@ -1,0 +1,201 @@
+# Threshold-based metric events for raspberrypi (OTEL_HOST-84F366C2F255C06A).
+# Apply with: dtctl apply -f dynatrace/alerts/raspberry-metric-events.yaml
+#
+# Schema: builtin:anomaly-detection.metric-events (issue #9). Field names verified
+# against the live schema in this environment — the ticket's draft used
+# name/tags/metricSelector/monitoringStrategy, none of which exist on this schema;
+# the real top-level fields are summary/queryDefinition/modelProperties/eventTemplate,
+# and there is no per-event tags field at all.
+#
+# Memory and disk thresholds are absolute bytes of the "used" state, not a computed
+# percentage: a full DQL `timeseries` expression (the ticket's approach) is not valid
+# as `metricSelector` here (that field takes the classic metric-selector language,
+# and queryDefinition.type=METRIC_KEY only supports STATIC_THRESHOLD, not a formula
+# across dimensions). Since this Pi's disk/RAM are fixed hardware, thresholding on
+# raw bytes is equivalent to a percentage threshold and needs one less settings
+# object (no calculated-metric/stored-query dependency). Capacities measured live
+# on 2026-07-24:
+#   RAM   (used+free+cached+buffered) = 1,076,047,872 bytes  (same formula as the
+#         "Memory Used" tile in dynatrace/dashboards/raspberry-metrics.yaml)
+#   Disk  (used+free+reserved, mountpoint "/") = 31,082,115,072 bytes
+# 80%/90% of those give the thresholds below.
+
+- id: vu9U3hXa3q0AAAABACdidWlsdGluOmFub21hbHktZGV0ZWN0aW9uLm1ldHJpYy1ldmVudHMABnRlbmFudAAGdGVuYW50ACQ3YjIxN2Y0OC1iYWZlLTNkOGEtODBmYi0xMDIxYTJmMTRhM2a-71TeFdrerQ
+  schemaId: builtin:anomaly-detection.metric-events
+  scope: environment
+  value:
+    enabled: true
+    summary: "[Bluebox] raspberrypi — CPU load warning"
+    queryDefinition:
+      type: METRIC_KEY
+      metricKey: pi.cpu.load_1m
+      aggregation: AVG
+      dimensionFilter: []
+      entityFilter:
+        conditions: []
+    modelProperties:
+      type: STATIC_THRESHOLD
+      alertCondition: ABOVE
+      threshold: 3.2
+      samples: 5
+      violatingSamples: 5
+      dealertingSamples: 5
+      alertOnNoData: false
+    eventTemplate:
+      title: "raspberrypi CPU load — warning"
+      description: "1-minute load average above 3.2 (80% of 4 logical CPUs) for 5 consecutive minutes."
+      eventType: CUSTOM_ALERT
+      davisMerge: true
+
+- id: vu9U3hXa3q0AAAABACdidWlsdGluOmFub21hbHktZGV0ZWN0aW9uLm1ldHJpYy1ldmVudHMABnRlbmFudAAGdGVuYW50ACRkNmZmZTU1ZS1jNDdiLTM5ZWEtYWY4My0zM2EzZjIxOTI5Yjm-71TeFdrerQ
+  schemaId: builtin:anomaly-detection.metric-events
+  scope: environment
+  value:
+    enabled: true
+    summary: "[Bluebox] raspberrypi — CPU load critical"
+    queryDefinition:
+      type: METRIC_KEY
+      metricKey: pi.cpu.load_1m
+      aggregation: AVG
+      dimensionFilter: []
+      entityFilter:
+        conditions: []
+    modelProperties:
+      type: STATIC_THRESHOLD
+      alertCondition: ABOVE
+      threshold: 4.0
+      samples: 10
+      violatingSamples: 8
+      dealertingSamples: 5
+      alertOnNoData: false
+    eventTemplate:
+      title: "raspberrypi CPU load — CRITICAL"
+      description: "1-minute load average above 4.0 (100% of 4 logical CPUs) sustained for 8 of the last 10 minutes."
+      eventType: CUSTOM_ALERT
+      davisMerge: true
+
+- id: vu9U3hXa3q0AAAABACdidWlsdGluOmFub21hbHktZGV0ZWN0aW9uLm1ldHJpYy1ldmVudHMABnRlbmFudAAGdGVuYW50ACRjYTE2ZDA4Yi1iZTFmLTNiNmUtOWEwZS03ZmRiYjU3NGRmMje-71TeFdrerQ
+  schemaId: builtin:anomaly-detection.metric-events
+  scope: environment
+  value:
+    enabled: true
+    summary: "[Bluebox] raspberrypi — Memory usage warning"
+    queryDefinition:
+      type: METRIC_KEY
+      metricKey: system.memory.usage
+      aggregation: AVG
+      dimensionFilter:
+        - dimensionKey: state
+          operator: EQUALS
+          dimensionValue: used
+      entityFilter:
+        conditions: []
+    modelProperties:
+      type: STATIC_THRESHOLD
+      alertCondition: ABOVE
+      threshold: 860838298
+      samples: 5
+      violatingSamples: 5
+      dealertingSamples: 5
+      alertOnNoData: false
+    eventTemplate:
+      title: "raspberrypi memory usage — warning"
+      description: "Used memory above 860,838,298 bytes (80% of ~1,076,047,872 bytes total: used+free+cached+buffered) for 5 minutes."
+      eventType: CUSTOM_ALERT
+      davisMerge: true
+
+- id: vu9U3hXa3q0AAAABACdidWlsdGluOmFub21hbHktZGV0ZWN0aW9uLm1ldHJpYy1ldmVudHMABnRlbmFudAAGdGVuYW50ACQxMWZlZDVmZC01YTZkLTNjNWQtOGZjZi1mMjMwYzA1YzNiOGO-71TeFdrerQ
+  schemaId: builtin:anomaly-detection.metric-events
+  scope: environment
+  value:
+    enabled: true
+    summary: "[Bluebox] raspberrypi — Memory usage critical"
+    queryDefinition:
+      type: METRIC_KEY
+      metricKey: system.memory.usage
+      aggregation: AVG
+      dimensionFilter:
+        - dimensionKey: state
+          operator: EQUALS
+          dimensionValue: used
+      entityFilter:
+        conditions: []
+    modelProperties:
+      type: STATIC_THRESHOLD
+      alertCondition: ABOVE
+      threshold: 968443085
+      samples: 10
+      violatingSamples: 8
+      dealertingSamples: 5
+      alertOnNoData: false
+    eventTemplate:
+      title: "raspberrypi memory usage — CRITICAL"
+      description: "Used memory above 968,443,085 bytes (90% of ~1,076,047,872 bytes total: used+free+cached+buffered) sustained for 8 of the last 10 minutes."
+      eventType: CUSTOM_ALERT
+      davisMerge: true
+
+- id: vu9U3hXa3q0AAAABACdidWlsdGluOmFub21hbHktZGV0ZWN0aW9uLm1ldHJpYy1ldmVudHMABnRlbmFudAAGdGVuYW50ACQ5YjM2MGJlOC0xYzVlLTMzNmEtOWYzYy00MmYwNWZjNzg1MDa-71TeFdrerQ
+  schemaId: builtin:anomaly-detection.metric-events
+  scope: environment
+  value:
+    enabled: true
+    summary: "[Bluebox] raspberrypi — Disk usage warning"
+    queryDefinition:
+      type: METRIC_KEY
+      metricKey: system.filesystem.usage
+      aggregation: AVG
+      dimensionFilter:
+        - dimensionKey: state
+          operator: EQUALS
+          dimensionValue: used
+        - dimensionKey: mountpoint
+          operator: EQUALS
+          dimensionValue: "/"
+      entityFilter:
+        conditions: []
+    modelProperties:
+      type: STATIC_THRESHOLD
+      alertCondition: ABOVE
+      threshold: 24865692058
+      samples: 5
+      violatingSamples: 5
+      dealertingSamples: 5
+      alertOnNoData: false
+    eventTemplate:
+      title: "raspberrypi disk usage — warning"
+      description: "Used disk (mountpoint /) above 24,865,692,058 bytes (80% of ~31,082,115,072 bytes total: used+free+reserved) for 5 minutes."
+      eventType: CUSTOM_ALERT
+      davisMerge: true
+
+- id: vu9U3hXa3q0AAAABACdidWlsdGluOmFub21hbHktZGV0ZWN0aW9uLm1ldHJpYy1ldmVudHMABnRlbmFudAAGdGVuYW50ACRmODQ3ZDU1Yy0yNTQ5LTM1NmMtODE4Mi1jMmYwYzg0MTRkYTS-71TeFdrerQ
+  schemaId: builtin:anomaly-detection.metric-events
+  scope: environment
+  value:
+    enabled: true
+    summary: "[Bluebox] raspberrypi — Disk usage critical"
+    queryDefinition:
+      type: METRIC_KEY
+      metricKey: system.filesystem.usage
+      aggregation: AVG
+      dimensionFilter:
+        - dimensionKey: state
+          operator: EQUALS
+          dimensionValue: used
+        - dimensionKey: mountpoint
+          operator: EQUALS
+          dimensionValue: "/"
+      entityFilter:
+        conditions: []
+    modelProperties:
+      type: STATIC_THRESHOLD
+      alertCondition: ABOVE
+      threshold: 27973903565
+      samples: 10
+      violatingSamples: 8
+      dealertingSamples: 5
+      alertOnNoData: false
+    eventTemplate:
+      title: "raspberrypi disk usage — CRITICAL"
+      description: "Used disk (mountpoint /) above 27,973,903,565 bytes (90% of ~31,082,115,072 bytes total: used+free+reserved) sustained for 8 of the last 10 minutes. Currently ~66% used — this is a real gap versus the ticket's cited 623GB/940GB figures, which appear to have a unit-scale error even though the ~66% ratio happened to be correct."
+      eventType: CUSTOM_ALERT
+      davisMerge: true

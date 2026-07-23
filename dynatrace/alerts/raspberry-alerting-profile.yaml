@@ -1,0 +1,27 @@
+# Alerting profile that groups the raspberrypi metric events (issue #9).
+# Apply with: dtctl apply -f dynatrace/alerts/raspberry-alerting-profile.yaml
+#
+# Schema: builtin:alerting.profile. Field names verified against the live schema —
+# the ticket's draft used displayName/severityRules[].tagFilter.tagFilters, neither
+# of which match; the real fields are name/severityRules[].tagFilterIncludeMode
+# +tagFilter (a flat list of tag strings).
+#
+# Scoped by severity CUSTOM_ALERT with no tag filter, rather than the ticket's
+# managed-by:bluebox tag filter: that schema's tagFilter matches tags on the
+# *entity* a problem is raised against, not on the metric-event config itself
+# (which has no tags field at all). Tagging OTEL_HOST-84F366C2F255C06A to make
+# tag-filtering work is an extra step with uncertain support for OTel-native
+# Smartscape entities in this environment. This tenant currently has zero other
+# CUSTOM_ALERT-type events, so scoping by severity alone is equivalent today and
+# avoids that dependency.
+
+- id: vu9U3hXa3q0AAAABABhidWlsdGluOmFsZXJ0aW5nLnByb2ZpbGUABnRlbmFudAAGdGVuYW50ACRkMjYwOTc1ZC1mZDg3LTM0ZDAtYWFjZi00MDMyMTczZTUzZja-71TeFdrerQ
+  schemaId: builtin:alerting.profile
+  scope: environment
+  value:
+    name: "[Bluebox] raspberrypi — critical infra alerts"
+    eventFilters: []
+    severityRules:
+      - severityLevel: CUSTOM_ALERT
+        delayInMinutes: 0
+        tagFilterIncludeMode: NONE

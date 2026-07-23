@@ -1,0 +1,32 @@
+# Email notification integration for raspberrypi alerts (issue #9).
+# Apply with: dtctl apply -f dynatrace/alerts/raspberry-email-notification.yaml
+# Must be applied AFTER raspberry-alerting-profile.yaml — `alertingProfile` below
+# needs that profile's real object ID substituted in.
+#
+# Schema: builtin:problem.notifications. Field names verified against the live
+# schema — the ticket's draft put receivers/subject/body at the top level; the
+# real schema nests them under `emailNotification`, and the field is `recipients`
+# not `receivers`. Placeholders also verified: {ProblemImpactedEntities} and
+# {ProblemStartTime} (used in the ticket's draft) don't exist — the real
+# placeholders are {ImpactedEntity}/{ImpactedEntityNames} and there is no
+# start-time placeholder.
+
+- id: vu9U3hXa3q0AAAABAB1idWlsdGluOnByb2JsZW0ubm90aWZpY2F0aW9ucwAGdGVuYW50AAZ0ZW5hbnQAJGJhMjZmZTkxLWFkMDktMzc4NC1hYzM0LTNkYmI1NWMzYWU5Ob7vVN4V2t6t
+  schemaId: builtin:problem.notifications
+  scope: environment
+  value:
+    type: EMAIL
+    displayName: "[Bluebox] raspberrypi — email alerts"
+    enabled: true
+    alertingProfile: "vu9U3hXa3q0AAAABABhidWlsdGluOmFsZXJ0aW5nLnByb2ZpbGUABnRlbmFudAAGdGVuYW50ACRkMjYwOTc1ZC1mZDg3LTM0ZDAtYWFjZi00MDMyMTczZTUzZja-71TeFdrerQ"
+    emailNotification:
+      recipients:
+        - "cinzko@gmail.com"
+      subject: "{State} {ProblemTitle} — raspberrypi"
+      body: |
+        Problem: {ProblemTitle}
+        Severity: {ProblemSeverity}
+        Impacted entity: {ImpactedEntity}
+
+        View in Dynatrace: {ProblemURL}
+      notifyClosedProblems: true
