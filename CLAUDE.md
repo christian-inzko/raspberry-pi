@@ -33,6 +33,8 @@ Both `rtl_433_pipeline_dynatrace.py` and `sungrow_read.py` use the same env vars
 | `DT_API_TOKEN` | Yes for `rtl_433_pipeline_dynatrace.py` (exits on startup if unset); optional for `sungrow_read.py` (skips ingest if unset) | — |
 | `DT_METRIC_INGEST_URL` | No | Hardcoded Dynatrace sprint URL in source |
 
+`sungrow_read.py` additionally reads `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` (optional, defaults to `http://localhost:4318/v1/traces` — the local `otelcol-contrib` OTLP receiver). See "OTel tracing (sungrow_read.py)" below.
+
 ## Testing rtl_433 pipeline on the Pi
 
 The Pi is at `pi@10.0.0.3`. SSH requires the key at `~/.ssh/raspi_id_rsa`.
@@ -154,6 +156,14 @@ The `filelog` receiver tails `/home/pi/rtl_433_pipeline_dynatrace.log` and `/hom
 
 `DT_API_TOKEN` needs the `logs.ingest` scope added (in addition to `metrics.ingest`) for this pipeline to authenticate — check the token's scopes in Dynatrace before deploying this config.
 
+### Traces (Pi → Dynatrace)
+
+The `otlp` receiver (`protocols.http`, bound to `127.0.0.1:4318`, local-only — no process outside the Pi can submit spans) accepts OTLP/HTTP spans from local scripts and forwards them through the `otlp_http` exporter's `traces_endpoint`. `sungrow_read.py` is currently the only emitter (see "OTel tracing" under the Sungrow reader section below).
+
+This was added for issue #11 (Bluebox SRE investigation): the Bluebox setup page's telemetry check looks specifically for service-level data (a span with a `service.name` resource attribute, producing an `OTEL_SERVICE` entity) — host metrics and logs alone don't satisfy it, even though they prove the device is fully instrumented for its actual purpose. This minimal one-span-per-run addition to `sungrow_read.py` gives the check something to find without adding tracing to the whole codebase.
+
+`DT_API_TOKEN` needs the `openTelemetryTrace.ingest` scope (in addition to `metrics.ingest` and `logs.ingest`) for this pipeline to authenticate.
+
 ### Home Assistant PV metrics receiver
 
 The `prometheus/homeassistant` receiver in `otel/config.yaml` scrapes PV-system metrics from a second Raspberry Pi 4 (`192.168.86.211`) running Home Assistant, which itself reads a Sungrow SH8.0RT-20 inverter (WiNet-S dongle, `192.168.86.26`) over Modbus TCP. This is separate from and complementary to `sungrow_read.py` (which reads a different inverter directly via Modbus TCP and cron, see below) — this receiver instead scrapes HA's built-in Prometheus exporter for the daily/cumulative energy sensors HA already tracks.
@@ -219,6 +229,12 @@ Reads are batched into three blocks to avoid Modbus IllegalAddress errors:
 
 The 5200 register range (alternative battery power) is inaccessible on this device and was not used.
 
+### OTel tracing
+
+`sungrow_read.py` wraps its whole run in a single `sungrow_read.run` span (`service.name: sungrow-read`), exported via OTLP/HTTP to the local `otelcol-contrib` collector's `otlp` receiver (`http://localhost:4318/v1/traces` by default, overridable with `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`), which forwards it to Dynatrace. `requirements`: `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http` (in addition to `pymodbus`, `requests`).
+
+This exists solely to give Bluebox's setup-page telemetry check a `service.name` to find (see "Traces (Pi → Dynatrace)" above, issue #11) — it is not needed for the script's own metrics/JSON-output purpose, so `rtl_433_pipeline_dynatrace.py` was deliberately left uninstrumented. The span export uses `BatchSpanProcessor`, so `main()` calls `force_flush()` in a `finally` block before the process exits — without it, the batch would still be queued in a background thread when the one-shot cron process ends and the span would be silently lost. If the local collector is unreachable, the SDK logs an export error internally but does not raise, so it can't break the script's other outputs (stdout JSON, metric ingest).
+
 ### Running manually on the Pi
 
 ```bash
@@ -240,6 +256,8 @@ scp -i ~/.ssh/raspi_id_rsa sungrow_read.py pi@10.0.0.3:/home/pi/sungrow_read.py
 
 No restart needed — cron picks up the new file on the next minute tick.
 
+One-time on the Pi: install the OTel packages (`pip3 install opentelemetry-sdk opentelemetry-exporter-otlp-proto-http`) and deploy the updated `otel/config.yaml` (see "Deploying a config change" above, needed for the new `otlp` receiver/`traces` pipeline) before the traced version will actually reach Dynatrace — otherwise the script still runs fine, it just logs a local export error each run (see "OTel tracing" above).
+
 ### Auto-start and scheduling
 
 The Pi's crontab has two entries for the Sungrow reader:
@@ -259,7 +277,8 @@ Metrics are ingested under the `sungrow_` prefix with a `device=<host>` dimensio
 
 The "Sungrow metrics" dashboard (`751301dc-6ef3-4af6-a9a0-efc7131d5ba1`) shows:
 - Row 1 (full width): Area chart — PV yield, grid (±), battery (±), house load over 24 h
-- Row 2: Battery SOC line chart, current battery level (single value), current inverter temperature (single value)
+- Row 2 (full width): Outdoor temperature (°C) & humidity (%) line chart (`AmbientWeather-TX8300`) — added 2026-07-21; an indoor series (`Hideki-TS04`) was on this tile too but was removed 2026-07-23 as out of place on an inverter-focused dashboard
+- Row 3: Battery SOC line chart, current battery level (single value), current inverter temperature (single value)
 
 ## Architecture
 

@@ -7,11 +7,14 @@ Register map source: mkaiser/Sungrow-SHx-Inverter-Modbus-Home-Assistant
 Addressing:  0-based (pymodbus); YAML comment "reg N" = address N-1.
 Word order:  32-bit registers use little-endian word order (low word at lower address).
 
-Requires:  pip install pymodbus requests
+Requires:  pip install pymodbus requests opentelemetry-sdk opentelemetry-exporter-otlp-proto-http
 
 Environment variables:
   DT_API_TOKEN        Required for Dynatrace ingest; skips ingest if unset.
   DT_METRIC_INGEST_URL  Optional; defaults to the project sprint URL.
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT  Optional; defaults to the local
+                        otelcol-contrib OTLP/HTTP receiver, which forwards
+                        spans to Dynatrace (see otel/config.yaml).
 
 Usage:
   python3 sungrow_read.py [--host HOST] [--port PORT] [--slave SLAVE]
@@ -45,6 +48,12 @@ else:
 
 from pymodbus.exceptions import ModbusException
 
+from opentelemetry import trace
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
@@ -63,6 +72,17 @@ DT_METRIC_INGEST_URL = os.environ.get(
 DT_API_TOKEN = os.environ.get("DT_API_TOKEN")
 
 METRIC_PREFIX = "sungrow_"
+
+OTEL_TRACES_ENDPOINT = os.environ.get(
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://localhost:4318/v1/traces"
+)
+
+_tracer_provider = TracerProvider(resource=Resource.create({"service.name": "sungrow-read"}))
+_tracer_provider.add_span_processor(
+    BatchSpanProcessor(OTLPSpanExporter(endpoint=OTEL_TRACES_ENDPOINT))
+)
+trace.set_tracer_provider(_tracer_provider)
+tracer = trace.get_tracer("sungrow_read")
 
 # fmt: (fc, address, name, dtype, scale, unit)
 #   fc=4   input register
@@ -159,41 +179,51 @@ def main():
     parser.add_argument("--slave", type=int, default=DEFAULT_SLAVE)
     args = parser.parse_args()
 
-    client = ModbusTcpClient(args.host, port=args.port)
-    if not client.connect():
-        log.error("Failed to connect to %s:%d", args.host, args.port)
-        sys.exit(1)
-    log.info("Connected to %s:%d slave=%d", args.host, args.port, args.slave)
+    try:
+        with tracer.start_as_current_span("sungrow_read.run") as span:
+            span.set_attribute("sungrow.host", args.host)
 
-    raw = {}
-    for fc, start, count in READ_BLOCKS:
-        for addr, val in read_block(client, fc, start, count, args.slave).items():
-            raw[(fc, addr)] = val
-    client.close()
+            client = ModbusTcpClient(args.host, port=args.port)
+            if not client.connect():
+                log.error("Failed to connect to %s:%d", args.host, args.port)
+                sys.exit(1)
+            log.info("Connected to %s:%d slave=%d", args.host, args.port, args.slave)
 
-    timestamp_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+            raw = {}
+            for fc, start, count in READ_BLOCKS:
+                for addr, val in read_block(client, fc, start, count, args.slave).items():
+                    raw[(fc, addr)] = val
+            client.close()
 
-    results = []
-    for fc, address, name, dtype, scale, unit in TARGET_REGISTERS:
-        v = decode(raw, fc, address, dtype)
-        value = None if v is None else (round(v * scale, 4) if scale != 1 else v)
-        results.append({"name": name, "value": value, "unit": unit})
+            timestamp_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
 
-    # stdout — always
-    output = {
-        "timestamp": datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc).isoformat(),
-        "host": args.host,
-        "registers": results,
-    }
-    json.dump(output, sys.stdout, indent=2, ensure_ascii=False)
-    sys.stdout.write("\n")
+            results = []
+            for fc, address, name, dtype, scale, unit in TARGET_REGISTERS:
+                v = decode(raw, fc, address, dtype)
+                value = None if v is None else (round(v * scale, 4) if scale != 1 else v)
+                results.append({"name": name, "value": value, "unit": unit})
+            span.set_attribute(
+                "sungrow.registers_read", sum(1 for r in results if r["value"] is not None)
+            )
 
-    # Dynatrace ingest — only if token is set
-    if DT_API_TOKEN:
-        mint_lines = build_mint_lines(results, args.host, timestamp_ms)
-        send_to_dynatrace(DT_METRIC_INGEST_URL, DT_API_TOKEN, mint_lines)
-    else:
-        log.warning("DT_API_TOKEN not set — skipping Dynatrace ingest")
+            # stdout — always
+            output = {
+                "timestamp": datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc).isoformat(),
+                "host": args.host,
+                "registers": results,
+            }
+            json.dump(output, sys.stdout, indent=2, ensure_ascii=False)
+            sys.stdout.write("\n")
+
+            # Dynatrace ingest — only if token is set
+            if DT_API_TOKEN:
+                mint_lines = build_mint_lines(results, args.host, timestamp_ms)
+                send_to_dynatrace(DT_METRIC_INGEST_URL, DT_API_TOKEN, mint_lines)
+            else:
+                log.warning("DT_API_TOKEN not set — skipping Dynatrace ingest")
+    finally:
+        # One-shot cron script — must flush before exit or the batched span is lost.
+        _tracer_provider.force_flush(timeout_millis=5000)
 
 
 if __name__ == "__main__":

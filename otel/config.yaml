@@ -38,6 +38,11 @@ receivers:
       - /home/pi/sungrow_read.log
     start_at: end
 
+  otlp:
+    protocols:
+      http:
+        endpoint: 127.0.0.1:4318
+
 processors:
   batch:
   resourcedetection:
@@ -80,6 +85,7 @@ exporters:
   otlp_http:
     metrics_endpoint: https://rhp60717.sprint.dynatracelabs.com/api/v2/otlp/v1/metrics
     logs_endpoint: https://rhp60717.sprint.dynatracelabs.com/api/v2/otlp/v1/logs
+    traces_endpoint: https://rhp60717.sprint.dynatracelabs.com/api/v2/otlp/v1/traces
     headers:
       Authorization: "Api-Token ${env:DT_API_TOKEN}"
 
@@ -95,5 +101,9 @@ service:
       exporters: [otlp_http]
     logs:
       receivers: [filelog]
+      processors: [resourcedetection, batch]
+      exporters: [otlp_http]
+    traces:
+      receivers: [otlp]
       processors: [resourcedetection, batch]
       exporters: [otlp_http]
