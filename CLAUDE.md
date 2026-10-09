@@ -195,7 +195,7 @@ HA's Prometheus exporter names metrics by domain/unit (e.g. `homeassistant_senso
 
 ### Dynatrace dashboard
 
-The "Raspberry metrics" dashboard (`7f16613e-5aff-4a73-b448-ff66b7758efb`) shows all sensor and host metrics. Row 1: temperature and humidity. Row 2: CPU load average (line chart), memory % used (single value), disk % used (single value).
+The "Raspberry metrics" dashboard (`7f16613e-5aff-4a73-b448-ff66b7758efb`) shows all sensor and host metrics. Row 1: temperature and humidity. Row 2: CPU usage %, memory usage %, disk usage % for `/` (all line charts; CPU = 1 − idle/total of `system.cpu.time`).
 
 See the separate "Sungrow metrics" dashboard for inverter metrics (`751301dc-6ef3-4af6-a9a0-efc7131d5ba1`).
 
@@ -276,7 +276,7 @@ The Pi's crontab has two entries for the Sungrow reader:
 Metrics are ingested under the `sungrow_` prefix with a `device=<host>` dimension. Unit and display name metadata is set once via the Settings API (`builtin:metric.metadata`; scope format `metric-<key>`).
 
 The "Sungrow metrics" dashboard (`751301dc-6ef3-4af6-a9a0-efc7131d5ba1`) shows:
-- Row 1 (full width): Area chart — PV yield, grid (±), battery (±), house load over 24 h
+- Row 1 (full width): Line chart "Power flow (W)" — Solar production, House consumption, Grid power (+ export / − import), Battery power (+ charging / − discharging). The battery sign is flipped in the DQL (`` `Battery power`[] * -1 ``) because the raw `sungrow_battery_power` is +ve = discharging
 - Row 2 (full width): Outdoor temperature (°C) & humidity (%) line chart (`AmbientWeather-TX8300`) — added 2026-07-21; an indoor series (`Hideki-TS04`) was on this tile too but was removed 2026-07-23 as out of place on an inverter-focused dashboard
 - Row 3: Battery SOC line chart, current battery level (single value), current inverter temperature (single value)
 
