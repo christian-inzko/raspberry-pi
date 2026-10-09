@@ -12,6 +12,9 @@ Requires:  pip install pymodbus requests opentelemetry-sdk opentelemetry-exporte
 Environment variables:
   DT_API_TOKEN        Required for Dynatrace ingest; skips ingest if unset.
   DT_METRIC_INGEST_URL  Optional; defaults to the project sprint URL.
+  DT2_ENVIRONMENT_URL + DT2_API_TOKEN
+                        Optional second tenant (e.g. https://abc12345.live.dynatrace.com);
+                        metrics are sent to both tenants when both are set.
   OTEL_EXPORTER_OTLP_TRACES_ENDPOINT  Optional; defaults to the local
                         otelcol-contrib OTLP/HTTP receiver, which forwards
                         spans to Dynatrace (see otel/config.yaml).
@@ -70,6 +73,21 @@ DT_METRIC_INGEST_URL = os.environ.get(
     "https://rhp60717.sprint.dynatracelabs.com/api/v2/metrics/ingest",
 )
 DT_API_TOKEN = os.environ.get("DT_API_TOKEN")
+
+
+def load_extra_target():
+    """Optional second Dynatrace tenant (DT2_ENVIRONMENT_URL + DT2_API_TOKEN), or None."""
+    env_url = os.environ.get("DT2_ENVIRONMENT_URL", "").rstrip("/")
+    token = os.environ.get("DT2_API_TOKEN")
+    if not env_url and not token:
+        return None
+    if not (env_url and token):
+        log.error("DT2_ENVIRONMENT_URL and DT2_API_TOKEN must both be set — second tenant disabled.")
+        return None
+    return env_url + "/api/v2/metrics/ingest", token
+
+
+DT_EXTRA_TARGET = load_extra_target()
 
 METRIC_PREFIX = "sungrow_"
 
@@ -215,12 +233,18 @@ def main():
             json.dump(output, sys.stdout, indent=2, ensure_ascii=False)
             sys.stdout.write("\n")
 
-            # Dynatrace ingest — only if token is set
+            # Dynatrace ingest — one send per configured tenant (a failure on one doesn't affect the other)
+            targets = []
             if DT_API_TOKEN:
-                mint_lines = build_mint_lines(results, args.host, timestamp_ms)
-                send_to_dynatrace(DT_METRIC_INGEST_URL, DT_API_TOKEN, mint_lines)
+                targets.append((DT_METRIC_INGEST_URL, DT_API_TOKEN))
             else:
-                log.warning("DT_API_TOKEN not set — skipping Dynatrace ingest")
+                log.warning("DT_API_TOKEN not set — skipping primary Dynatrace ingest")
+            if DT_EXTRA_TARGET:
+                targets.append(DT_EXTRA_TARGET)
+            if targets:
+                mint_lines = build_mint_lines(results, args.host, timestamp_ms)
+                for url, token in targets:
+                    send_to_dynatrace(url, token, mint_lines)
     finally:
         # One-shot cron script — must flush before exit or the batched span is lost.
         _tracer_provider.force_flush(timeout_millis=5000)

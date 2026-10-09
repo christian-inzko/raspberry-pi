@@ -89,21 +89,29 @@ exporters:
     headers:
       Authorization: "Api-Token ${env:DT_API_TOKEN}"
 
+  # Second tenant — needs DT2_ENVIRONMENT_URL (e.g. https://abc12345.live.dynatrace.com,
+  # no trailing slash) and DT2_API_TOKEN in the collector's env file. Every pipeline
+  # below fans out to both exporters.
+  otlp_http/tenant2:
+    endpoint: ${env:DT2_ENVIRONMENT_URL}/api/v2/otlp
+    headers:
+      Authorization: "Api-Token ${env:DT2_API_TOKEN}"
+
 service:
   pipelines:
     metrics/host:
       receivers: [host_metrics]
       processors: [resourcedetection, batch, cumulativetodelta, metrics_transform]
-      exporters: [otlp_http]
+      exporters: [otlp_http, otlp_http/tenant2]
     metrics/homeassistant:
       receivers: [prometheus/homeassistant]
       processors: [resource/homeassistant, batch, cumulativetodelta]
-      exporters: [otlp_http]
+      exporters: [otlp_http, otlp_http/tenant2]
     logs:
       receivers: [filelog]
       processors: [resourcedetection, batch]
-      exporters: [otlp_http]
+      exporters: [otlp_http, otlp_http/tenant2]
     traces:
       receivers: [otlp]
       processors: [resourcedetection, batch]
-      exporters: [otlp_http]
+      exporters: [otlp_http, otlp_http/tenant2]

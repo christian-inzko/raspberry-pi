@@ -25,6 +25,21 @@ dt_metric_ingest_url = os.environ.get(
 dt_token = os.environ.get("DT_API_TOKEN")
 
 
+def load_extra_target():
+    """Optional second Dynatrace tenant (DT2_ENVIRONMENT_URL + DT2_API_TOKEN), or None."""
+    env_url = os.environ.get("DT2_ENVIRONMENT_URL", "").rstrip("/")
+    token = os.environ.get("DT2_API_TOKEN")
+    if not env_url and not token:
+        return None
+    if not (env_url and token):
+        log.error("DT2_ENVIRONMENT_URL and DT2_API_TOKEN must both be set — second tenant disabled.")
+        return None
+    return env_url + "/api/v2/metrics/ingest", token
+
+
+dt_extra_target = load_extra_target()
+
+
 def scheduler_job():
     timestamp = datetime.now()
     log.info(f"SchedulerJob running at {timestamp}")
@@ -34,7 +49,11 @@ def scheduler_job():
             lines.append(q.get_nowait())
         except queue.Empty:
             break
-    send_metric_ingest(dt_metric_ingest_url, dt_token, lines)
+    targets = [(dt_metric_ingest_url, dt_token)]
+    if dt_extra_target:
+        targets.append(dt_extra_target)
+    for url, token in targets:
+        send_metric_ingest(url, token, lines)
     log.info(f"SchedulerJob finished at {timestamp} and has sent {len(lines)} lines")
 
 

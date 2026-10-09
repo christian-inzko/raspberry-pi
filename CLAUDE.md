@@ -32,6 +32,9 @@ Both `rtl_433_pipeline_dynatrace.py` and `sungrow_read.py` use the same env vars
 |---|---|---|
 | `DT_API_TOKEN` | Yes for `rtl_433_pipeline_dynatrace.py` (exits on startup if unset); optional for `sungrow_read.py` (skips ingest if unset) | — |
 | `DT_METRIC_INGEST_URL` | No | Hardcoded Dynatrace sprint URL in source |
+| `DT2_ENVIRONMENT_URL` + `DT2_API_TOKEN` | No — set both or neither | — (second tenant disabled) |
+
+**Second tenant:** when `DT2_ENVIRONMENT_URL` (e.g. `https://abc12345.live.dynatrace.com`, no trailing slash) and `DT2_API_TOKEN` are both set, `rtl_433_pipeline_dynatrace.py` and `sungrow_read.py` send every metric batch to both tenants (second target = `<DT2_ENVIRONMENT_URL>/api/v2/metrics/ingest`). Each send is independent, so a failure on one tenant doesn't affect the other. If only one of the two vars is set, an error is logged and the second tenant is ignored. The OTel collector does the same via the `otlp_http/tenant2` exporter (see below); its token needs the same scopes as `DT_API_TOKEN`.
 
 `sungrow_read.py` additionally reads `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` (optional, defaults to `http://localhost:4318/v1/traces` — the local `otelcol-contrib` OTLP receiver). See "OTel tracing (sungrow_read.py)" below.
 
@@ -103,7 +106,11 @@ The env file is not in version control (contains the tokens). Its contents:
 OTELCOL_OPTIONS="--config=/etc/otelcol-contrib/config.yaml"
 DT_API_TOKEN=<token>
 HA_API_TOKEN=<home assistant long-lived access token>
+DT2_ENVIRONMENT_URL=<second tenant URL, no trailing slash>
+DT2_API_TOKEN=<second tenant token>
 ```
+
+`otel/config.yaml` fans every pipeline (host metrics, HA metrics, logs, traces) out to both `otlp_http` (tenant 1) and `otlp_http/tenant2`. The `DT2_*` variables are **required** in the env file once this config is deployed — with them unset the second exporter's endpoint is invalid and the collector won't start. To run single-tenant, remove `otlp_http/tenant2` from the exporters list in each pipeline.
 
 Permissions on the env file: `root:otelcol-contrib 640`.
 

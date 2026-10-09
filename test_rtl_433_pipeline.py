@@ -182,6 +182,46 @@ class TestSchedulerJob:
         assert calls[0][0] == pipeline.dt_metric_ingest_url
         assert calls[0][1] == pipeline.dt_token
 
+    def test_sends_to_second_tenant_when_configured(self):
+        pipeline.q.put("x 1 1000")
+        calls = []
+        with patch.object(pipeline, "dt_extra_target", ("https://t2/api/v2/metrics/ingest", "tok2")), \
+             patch.object(pipeline, "send_metric_ingest",
+                          side_effect=lambda url, tok, lines: calls.append((url, tok, list(lines)))):
+            pipeline.scheduler_job()
+
+        assert calls == [
+            (pipeline.dt_metric_ingest_url, pipeline.dt_token, ["x 1 1000"]),
+            ("https://t2/api/v2/metrics/ingest", "tok2", ["x 1 1000"]),
+        ]
+
+    def test_only_primary_tenant_when_no_second_configured(self):
+        calls = []
+        with patch.object(pipeline, "dt_extra_target", None), \
+             patch.object(pipeline, "send_metric_ingest",
+                          side_effect=lambda url, tok, lines: calls.append(url)):
+            pipeline.scheduler_job()
+
+        assert calls == [pipeline.dt_metric_ingest_url]
+
+
+class TestLoadExtraTarget:
+    def test_none_when_unset(self, monkeypatch):
+        monkeypatch.delenv("DT2_ENVIRONMENT_URL", raising=False)
+        monkeypatch.delenv("DT2_API_TOKEN", raising=False)
+        assert pipeline.load_extra_target() is None
+
+    def test_builds_ingest_url_and_strips_trailing_slash(self, monkeypatch):
+        monkeypatch.setenv("DT2_ENVIRONMENT_URL", "https://abc.live.dynatrace.com/")
+        monkeypatch.setenv("DT2_API_TOKEN", "tok2")
+        assert pipeline.load_extra_target() == (
+            "https://abc.live.dynatrace.com/api/v2/metrics/ingest", "tok2")
+
+    def test_none_when_only_one_of_the_two_is_set(self, monkeypatch):
+        monkeypatch.setenv("DT2_ENVIRONMENT_URL", "https://abc.live.dynatrace.com")
+        monkeypatch.delenv("DT2_API_TOKEN", raising=False)
+        assert pipeline.load_extra_target() is None
+
 
 # ---------------------------------------------------------------------------
 # Metric line format (mirrors __main__ parsing logic)
