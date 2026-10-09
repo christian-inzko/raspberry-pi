@@ -199,6 +199,12 @@ The "Raspberry metrics" dashboard (`7f16613e-5aff-4a73-b448-ff66b7758efb`) shows
 
 See the separate "Sungrow metrics" dashboard for inverter metrics (`751301dc-6ef3-4af6-a9a0-efc7131d5ba1`).
 
+The "Home Assistant Prometheus receiver metrics" dashboard (`9ee37c5d-d887-48d8-84b1-a94a21133447`) shows the `prometheus/homeassistant` metrics:
+- HA process CPU (% of 4 cores = CPU seconds ÷ 60 s scrape interval ÷ 4) and memory (% of 4 GB) — process-level only, since HA's Prometheus export has no host CPU/memory sensors (would need the System Monitor integration).
+- Sensor charts grouped by function and unit (grid/meter, PV/house, phases, limits, Shelly plugs, daily/total energy, battery, voltage, current, temperatures, network). Each tile filters out series that are constant in the selected timeframe (`arrayMax(v) != arrayMin(v)`); no separate "constants" tile because those series were 0 over 30 days.
+- "Inverter state (decoded)" table: raw Sungrow codes decoded with the mkaiser register map (on/off 0xAA/0x55, running state, EMS mode, device type code, ...). The protocol version decoding (`V1.0.5.0`, raw bytes dotted) and the `0xFFFF` = "not available" reading for the APL registers are guesses — the register map doesn't document them.
+- "Sensor Timestamp" table converts epoch seconds to real timestamps.
+
 ## Sungrow inverter reader (sungrow_read.py)
 
 `sungrow_read.py` is a one-shot script that reads Sungrow SH6.0RT hybrid inverter registers via Modbus TCP, writes JSON to stdout, and optionally sends metrics to Dynatrace. It is driven entirely by cron — no daemon, no background threads.
