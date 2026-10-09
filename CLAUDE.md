@@ -199,6 +199,8 @@ The "Raspberry metrics" dashboard (`7f16613e-5aff-4a73-b448-ff66b7758efb`) shows
 
 See the separate "Sungrow metrics" dashboard for inverter metrics (`751301dc-6ef3-4af6-a9a0-efc7131d5ba1`).
 
+All three dashboards are versioned in `dynatrace/dashboards/*.yaml` (id, name, type, content). Deploy to a tenant with `dtctl apply -f dynatrace/dashboards/<name>.yaml` (or loop over the directory): on a new tenant the file's `id` doesn't exist yet so it is created with that same id, and re-running updates it in place. Switch tenant first with `dtctl config set-context` / `dtctl auth login`. After editing a dashboard in the UI, re-export with `dtctl get dashboard <id> -o json` and rewrite the YAML (keep only `id`, `name`, `type`, `content`).
+
 The "Home Assistant Prometheus receiver metrics" dashboard (`9ee37c5d-d887-48d8-84b1-a94a21133447`) shows the `prometheus/homeassistant` metrics:
 - HA process CPU (% of 4 cores = CPU seconds ÷ 60 s scrape interval ÷ 4) and memory (% of 4 GB) — process-level only, since HA's Prometheus export has no host CPU/memory sensors (would need the System Monitor integration).
 - Sensor charts grouped by function and unit (grid/meter, PV/house, phases, limits, Shelly plugs, daily/total energy, battery, voltage, current, temperatures, network). Each tile filters out series that are constant in the selected timeframe (`arrayMax(v) != arrayMin(v)`); no separate "constants" tile because those series were 0 over 30 days.

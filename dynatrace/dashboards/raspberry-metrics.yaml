@@ -1,181 +1,368 @@
 id: 7f16613e-5aff-4a73-b448-ff66b7758efb
 name: Raspberry metrics
 type: dashboard
-owner: 777f6e4b-adba-4c42-b132-74a008ff71c9
-isPrivate: true
 content:
-  annotations: []
+  annotations:
+  - displaySettings:
+      color: 'var(--dt-colors-charts-loglevel-info-default, #0057bf)'
+      referenceIds:
+      - 3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*
+    input: ''
+    key: 7c39a1e4-fd55-40b2-a9ec-5f869d0c2954
+    name: Annotation 1
+    type: query
+    version: 2
   importedWithCode: false
+  layouts:
+    '0':
+      h: 6
+      w: 10
+      x: 0
+      y: 0
+    '1':
+      h: 6
+      w: 12
+      x: 10
+      y: 0
+    '10':
+      h: 6
+      w: 6
+      x: 6
+      y: 18
+    '11':
+      h: 6
+      w: 12
+      x: 12
+      y: 18
+    '2':
+      h: 6
+      w: 8
+      x: 0
+      y: 6
+    '3':
+      h: 6
+      w: 6
+      x: 9
+      y: 6
+    '4':
+      h: 6
+      w: 8
+      x: 16
+      y: 6
+    '5':
+      h: 6
+      w: 6
+      x: 0
+      y: 12
+    '6':
+      h: 6
+      w: 6
+      x: 6
+      y: 12
+    '7':
+      h: 6
+      w: 6
+      x: 12
+      y: 12
+    '8':
+      h: 6
+      w: 6
+      x: 18
+      y: 12
+    '9':
+      h: 6
+      w: 6
+      x: 0
+      y: 18
   settings:
     defaultTimeframe:
       enabled: true
       value:
         from: now()-24h
         to: now()
-  layouts:
-    "0":
-      h: 6
-      w: 10
-      x: 0
-      "y": 0
-    "1":
-      h: 6
-      w: 12
-      x: 10
-      "y": 0
-    "2":
-      h: 6
-      w: 8
-      x: 0
-      "y": 6
-    "3":
-      h: 6
-      w: 8
-      x: 8
-      "y": 6
-    "4":
-      h: 6
-      w: 8
-      x: 16
-      "y": 6
   tiles:
-    "0":
+    '0':
       davis:
         davisVisualization:
           isAvailable: true
         enabled: false
-      query: 'timeseries { avg(thermometer.temperature), value.A = avg(thermometer.temperature, scalar: true) }, by: { channel, model, id }'
-      queryConfig:
-        subQueries:
-          - by:
-              - channel
-              - model
-              - id
-            convertToValue: Avg
-            datatype: metrics
-            id: A
-            isEnabled: true
-            metric:
-              aggregation: avg
-              key: thermometer.temperature
-        version: 20
+      query: "timeseries {\n  Outdoor = avg(thermometer.temperature, filter: {model == \"AmbientWeather-TX8300\"}),\n  Indoor\
+        \ = avg(thermometer.temperature, filter: {model == \"Hideki-TS04\"})\n}\n"
       querySettings:
         defaultSamplingRatio: 10
         defaultScanLimitGbytes: 500
         enableSampling: false
         maxResultMegaBytes: 1
         maxResultRecords: 1000
-      subType: dql-builder-metrics
-      title: Temperature
+      title: Temperature (Indoor & Outdoor)
       type: data
       visualization: lineChart
       visualizationSettings:
         autoSelectVisualization: true
-    "1":
+    '1':
       davis:
         davisVisualization:
           isAvailable: true
         enabled: false
-      query: 'timeseries { avg(thermometer.humidity), value.A = avg(thermometer.humidity, scalar: true) }, by: { channel, model, id }'
-      queryConfig:
-        subQueries:
-          - by:
-              - channel
-              - model
-              - id
-            convertToValue: Avg
-            datatype: metrics
-            id: A
-            isEnabled: true
-            metric:
-              aggregation: avg
-              key: thermometer.humidity
-        version: 20
+      query: "timeseries {\n  Outdoor = avg(thermometer.humidity, filter: {model == \"AmbientWeather-TX8300\"}),\n  Indoor\
+        \ = avg(thermometer.humidity, filter: {model == \"Hideki-TS04\"})\n}\n"
       querySettings:
         defaultSamplingRatio: 10
         defaultScanLimitGbytes: 500
         enableSampling: false
         maxResultMegaBytes: 1
         maxResultRecords: 1000
-      subType: dql-builder-metrics
-      title: Humidity
+      title: Humidity (Indoor & Outdoor)
       type: data
       visualization: lineChart
       visualizationSettings:
         autoSelectVisualization: true
-    "2":
+    '10':
+      coloring:
+        colorRules:
+        - colorMode: custom-color
+          comparator: '>'
+          customColor:
+            Default: '#2f6862'
+          field: count
+          value: -1
+        - colorMode: custom-color
+          comparator: '>'
+          customColor:
+            Default: '#eea53c'
+          field: count
+          value: 0
       davis:
         davisVisualization:
           isAvailable: true
         enabled: false
-      query: |
-        timeseries {
-          load1m = avg(pi.cpu.load_1m),
-          load5m = avg(pi.cpu.load_5m),
-          load15m = avg(pi.cpu.load_15m)
-        }
-      title: CPU Load Average
+      query: 'fetch logs
+
+        | filter dt.openpipeline.source == "/api/v2/otlp/v1/logs"
+
+        | filter contains(content, "WARNING")
+
+        | summarize count = count()
+
+        '
+      querySettings:
+        defaultSamplingRatio: 10
+        defaultScanLimitGbytes: 500
+        enableSampling: false
+        maxResultMegaBytes: 1
+        maxResultRecords: 1000
+      title: Pipeline Log Warnings (24h)
+      type: data
+      visualization: singleValue
+      visualizationSettings:
+        autoSelectVisualization: false
+        singleValue:
+          label: warnings
+          recordField: count
+    '11':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'fetch logs
+
+        | filter dt.openpipeline.source == "/api/v2/otlp/v1/logs"
+
+        | sort timestamp desc
+
+        | limit 100
+
+        | fields timestamp, log.file.name, content
+
+        '
+      querySettings:
+        defaultSamplingRatio: 10
+        defaultScanLimitGbytes: 500
+        enableSampling: false
+        maxResultMegaBytes: 1
+        maxResultRecords: 1000
+      title: Recent Pipeline Logs
+      type: data
+      visualization: table
+      visualizationSettings:
+        autoSelectVisualization: false
+    '2':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: "timeseries {\n  total = sum(system.cpu.time),\n  idle = sum(system.cpu.time, filter: {state == \"idle\"})\n\
+        }\n| fieldsAdd `CPU usage (%)` = (1 - idle[] / total[]) * 100\n| fieldsRemove total, idle\n"
+      querySettings:
+        defaultSamplingRatio: 10
+        defaultScanLimitGbytes: 500
+        enableSampling: false
+        maxResultMegaBytes: 1
+        maxResultRecords: 1000
+      title: CPU Usage (%)
       type: data
       visualization: lineChart
       visualizationSettings:
         autoSelectVisualization: false
-        lineChart:
+        chartSettings:
           legend:
-            showLegend: true
-    "3":
+            position: bottom
+    '3':
       davis:
         davisVisualization:
           isAvailable: true
         enabled: false
-      query: |
-        timeseries {
-          used = avg(system.memory.usage, filter: {state == "used"}),
-          free = avg(system.memory.usage, filter: {state == "free"}),
-          cached = avg(system.memory.usage, filter: {state == "cached"}),
-          buffered = avg(system.memory.usage, filter: {state == "buffered"})
-        }
-        | fieldsAdd total = arrayLast(used) + arrayLast(free) + arrayLast(cached) + arrayLast(buffered)
-        | fieldsAdd used_pct = arrayLast(used) * 100 / total
-        | fields used_pct
-      title: Memory Used
+      query: "timeseries {\n  used = avg(system.memory.usage, filter: {state == \"used\"}),\n  total = sum(system.memory.usage,\
+        \ rollup: avg)\n}\n| fieldsAdd `Memory usage (%)` = used[] / total[] * 100\n| fieldsRemove used, total\n"
+      querySettings:
+        defaultSamplingRatio: 10
+        defaultScanLimitGbytes: 500
+        enableSampling: false
+        maxResultMegaBytes: 1
+        maxResultRecords: 1000
+      title: Memory Usage (%)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '4':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: "timeseries {\n  used = avg(system.filesystem.usage, filter: {state == \"used\" and mountpoint == \"/\"}),\n\
+        \  free = avg(system.filesystem.usage, filter: {state == \"free\" and mountpoint == \"/\"})\n}\n| fieldsAdd `Disk\
+        \ usage (%)` = used[] / (used[] + free[]) * 100\n| fieldsRemove used, free\n"
+      querySettings:
+        defaultSamplingRatio: 10
+        defaultScanLimitGbytes: 500
+        enableSampling: false
+        maxResultMegaBytes: 1
+        maxResultRecords: 1000
+      title: Disk Usage / (%)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '5':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: "timeseries {\n  rx = sum(system.network.io, filter: {direction == \"receive\" and device != \"lo\" and device\
+        \ != \"docker0\"}),\n  tx = sum(system.network.io, filter: {direction == \"transmit\" and device != \"lo\" and device\
+        \ != \"docker0\"})\n}\n"
+      querySettings:
+        defaultSamplingRatio: 10
+        defaultScanLimitGbytes: 500
+        enableSampling: false
+        maxResultMegaBytes: 1
+        maxResultRecords: 1000
+      title: Network I/O
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+    '6':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: "timeseries {\n  errors = sum(system.network.errors, filter: {device != \"lo\" and device != \"docker0\"}),\n\
+        \  dropped = sum(system.network.dropped, filter: {device != \"lo\" and device != \"docker0\"})\n}\n"
+      querySettings:
+        defaultSamplingRatio: 10
+        defaultScanLimitGbytes: 500
+        enableSampling: false
+        maxResultMegaBytes: 1
+        maxResultRecords: 1000
+      title: Network Errors & Drops
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+    '7':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: "timeseries {\n  read = sum(system.disk.io, filter: {direction == \"read\" and device == \"mmcblk0\"}),\n  write\
+        \ = sum(system.disk.io, filter: {direction == \"write\" and device == \"mmcblk0\"})\n}\n"
+      querySettings:
+        defaultSamplingRatio: 10
+        defaultScanLimitGbytes: 500
+        enableSampling: false
+        maxResultMegaBytes: 1
+        maxResultRecords: 1000
+      title: Disk I/O
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+    '8':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: "timeseries {\n  busy_time = avg(system.disk.io_time, filter: {device == \"mmcblk0\"})\n}\n"
+      querySettings:
+        defaultSamplingRatio: 10
+        defaultScanLimitGbytes: 500
+        enableSampling: false
+        maxResultMegaBytes: 1
+        maxResultRecords: 1000
+      title: Disk I/O Time
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+    '9':
+      coloring:
+        colorRules:
+        - colorMode: custom-color
+          comparator: '>'
+          customColor:
+            Default: '#2f6862'
+          field: count
+          value: -1
+        - colorMode: custom-color
+          comparator: '>'
+          customColor:
+            Default: '#c62239'
+          field: count
+          value: 0
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'fetch logs
+
+        | filter dt.openpipeline.source == "/api/v2/otlp/v1/logs"
+
+        | filter contains(content, "ERROR")
+
+        | summarize count = count()
+
+        '
+      querySettings:
+        defaultSamplingRatio: 10
+        defaultScanLimitGbytes: 500
+        enableSampling: false
+        maxResultMegaBytes: 1
+        maxResultRecords: 1000
+      title: Pipeline Log Errors (24h)
       type: data
       visualization: singleValue
       visualizationSettings:
         autoSelectVisualization: false
         singleValue:
-          showLabel: true
-          label: "% used"
-          recordField: used_pct
-      coloring:
-        colorRules:
-          - { colorMode: custom-color, comparator: ">", customColor: { Default: "#2f6862" }, field: used_pct, value: -1 }
-          - { colorMode: custom-color, comparator: ">", customColor: { Default: "#eea53c" }, field: used_pct, value: 80 }
-          - { colorMode: custom-color, comparator: ">", customColor: { Default: "#c62239" }, field: used_pct, value: 90 }
-    "4":
-      davis:
-        davisVisualization:
-          isAvailable: true
-        enabled: false
-      query: |
-        timeseries {
-          used = avg(system.filesystem.usage, filter: {state == "used" and mountpoint == "/"}),
-          free = avg(system.filesystem.usage, filter: {state == "free" and mountpoint == "/"})
-        }
-        | fieldsAdd used_pct = arrayLast(used) * 100 / (arrayLast(used) + arrayLast(free))
-        | fields used_pct
-      title: Disk Used /
-      type: data
-      visualization: singleValue
-      visualizationSettings:
-        autoSelectVisualization: false
-        singleValue:
-          showLabel: true
-          label: "% used"
-          recordField: used_pct
-      coloring:
-        colorRules:
-          - { colorMode: custom-color, comparator: ">", customColor: { Default: "#2f6862" }, field: used_pct, value: -1 }
-          - { colorMode: custom-color, comparator: ">", customColor: { Default: "#eea53c" }, field: used_pct, value: 80 }
-          - { colorMode: custom-color, comparator: ">", customColor: { Default: "#c62239" }, field: used_pct, value: 90 }
+          label: errors
+          recordField: count
   variables: []
   version: 21

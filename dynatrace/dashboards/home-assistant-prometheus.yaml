@@ -1,0 +1,631 @@
+id: 9ee37c5d-d887-48d8-84b1-a94a21133447
+name: Home Assistant Prometheus receiver metrics
+type: dashboard
+content:
+  annotations: []
+  importedWithCode: false
+  layouts:
+    '0':
+      h: 6
+      w: 12
+      x: 0
+      y: 0
+    '1':
+      h: 6
+      w: 12
+      x: 12
+      y: 0
+    '10':
+      h: 8
+      w: 12
+      x: 0
+      y: 69
+    '11':
+      h: 8
+      w: 12
+      x: 12
+      y: 69
+    '20':
+      h: 7
+      w: 12
+      x: 0
+      y: 6
+    '21':
+      h: 7
+      w: 12
+      x: 12
+      y: 6
+    '22':
+      h: 7
+      w: 12
+      x: 0
+      y: 13
+    '23':
+      h: 7
+      w: 12
+      x: 12
+      y: 13
+    '24':
+      h: 7
+      w: 12
+      x: 0
+      y: 20
+    '25':
+      h: 7
+      w: 12
+      x: 12
+      y: 20
+    '26':
+      h: 7
+      w: 12
+      x: 0
+      y: 27
+    '27':
+      h: 7
+      w: 12
+      x: 12
+      y: 27
+    '28':
+      h: 7
+      w: 12
+      x: 0
+      y: 34
+    '29':
+      h: 7
+      w: 12
+      x: 12
+      y: 34
+    '30':
+      h: 7
+      w: 12
+      x: 0
+      y: 41
+    '31':
+      h: 7
+      w: 12
+      x: 12
+      y: 41
+    '32':
+      h: 7
+      w: 12
+      x: 0
+      y: 48
+    '33':
+      h: 7
+      w: 12
+      x: 12
+      y: 48
+    '34':
+      h: 7
+      w: 12
+      x: 0
+      y: 55
+    '35':
+      h: 7
+      w: 12
+      x: 12
+      y: 55
+    '36':
+      h: 7
+      w: 12
+      x: 0
+      y: 62
+    '37':
+      h: 7
+      w: 12
+      x: 12
+      y: 62
+  settings:
+    defaultTimeframe:
+      enabled: true
+      value:
+        from: now()-24h
+        to: now()
+  tiles:
+    '0':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries c = avg(process_cpu_seconds_total)
+
+        | fieldsAdd `CPU usage (%)` = c[] / 60 / 4 * 100
+
+        | fieldsRemove c
+
+        '
+      title: HA Process CPU (% of 4 cores)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '1':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries r = avg(process_resident_memory_bytes)
+
+        | fieldsAdd `Memory usage (%)` = r[] / (4 * 1024 * 1024 * 1024) * 100
+
+        | fieldsRemove r
+
+        '
+      title: HA Process Memory (% of 4 GB)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '10':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries val = avg(homeassistant_sensor_state), by:{friendly_name}
+
+        | fieldsAdd raw = arrayLast(val)
+
+        | fieldsAdd n = toLong(round(raw))
+
+        | fieldsAdd v0 = if(friendly_name == "Active power limitation raw", if(n==170,"On",else:if(n==85,"Off",else:if(n==65535,"Not
+        available (0xFFFF)",else:"Unknown"))))
+
+        | fieldsAdd v1 = if(friendly_name == "APL shutdown at zero raw", if(n==170,"On",else:if(n==85,"Off",else:if(n==65535,"Not
+        available (0xFFFF)",else:"Unknown"))))
+
+        | fieldsAdd v2 = if(friendly_name == "Backup mode raw", if(n==170,"On",else:if(n==85,"Off",else:"Unknown")))
+
+        | fieldsAdd v3 = if(friendly_name == "Battery forced charge discharge cmd raw", if(n==204,"Stop (default)",else:if(n==170,"Forced
+        charge",else:if(n==187,"Forced discharge",else:"Unknown"))))
+
+        | fieldsAdd v4 = if(friendly_name == "EMS mode selection raw", if(n==0,"Self-consumption (default)",else:if(n==2,"Forced
+        mode",else:if(n==3,"External EMS",else:if(n==4,"VPP",else:"Unknown")))))
+
+        | fieldsAdd v5 = if(friendly_name == "Export power limit mode raw", if(n==170,"On",else:if(n==85,"Off",else:"Unknown")))
+
+        | fieldsAdd v6 = if(friendly_name == "Load adjustment mode enable raw", if(n==170,"On",else:if(n==85,"Off",else:"Unknown")))
+
+        | fieldsAdd v7 = if(friendly_name == "Load adjustment mode selection raw", if(n==0,"Timing",else:if(n==1,"On/Off",else:if(n==2,"Power
+        optimization",else:if(n==3,"Disabled",else:"Unknown")))))
+
+        | fieldsAdd v8 = if(friendly_name == "Power Flow Status", if(n==0,"Idle",else:replacePattern(concat(if((n/1)%2==1,"PV
+        generating, ",else:""),if((n/2)%2==1,"Battery charging, ",else:""),if((n/4)%2==1,"Battery discharging, ",else:""),if((n/8)%2==1,"Positive
+        load power, ",else:""),if((n/16)%2==1,"Exporting, ",else:""),if((n/32)%2==1,"Importing, ",else:""),if((n/128)%2==1,"Negative
+        load power, ",else:"")), "'', '' EOS", "")))
+
+        | fieldsAdd v9 = if(friendly_name == "Running state raw", if(n==0,"Running",else:if(n==1,"Stop",else:if(n==2,"Key
+        stop",else:if(n==4,"Emergency stop",else:if(n==8,"Standby",else:if(n==16,"Initial standby",else:if(n==20,"Microgrid
+        operation",else:if(n==32,"Starting",else:if(n==64,"Running",else:if(n==65,"Off-grid charge",else:if(n==128,"Derating
+        running",else:if(n==256,"Fault",else:if(n==512,"Update failed",else:if(n==1024,"Running (maintain mode)",else:if(n==2048,"Running
+        (forced mode)",else:if(n==4096,"Running (off-grid)",else:if(n==4369,"Uninitialized",else:if(n==16384,"Running (external
+        EMS)",else:if(n==32768,"Stop",else:"Unknown"))))))))))))))))))))
+
+        | fieldsAdd v10 = if(friendly_name == "Sungrow device type code", if(n==3584,"SH5.0RT",else:if(n==3585,"SH6.0RT",else:if(n==3586,"SH8.0RT",else:if(n==3587,"SH10RT",else:if(n==3592,"SH5.0RT-V122",else:if(n==3593,"SH6.0RT-V122",else:if(n==3594,"SH8.0RT-V122",else:if(n==3595,"SH10RT-V122",else:if(n==3596,"SH5.0RT-V112",else:if(n==3597,"SH6.0RT-V112",else:if(n==3598,"SH8.0RT-V112",else:if(n==3599,"SH10RT-V112",else:if(n==3600,"SH5.0RT-20",else:if(n==3601,"SH6.0RT-20",else:if(n==3602,"SH8.0RT-20",else:if(n==3603,"SH10RT-20",else:if(n==3616,"SH5T",else:if(n==3617,"SH6T",else:if(n==3618,"SH8T",else:if(n==3619,"SH10T",else:if(n==3620,"SH12T",else:if(n==3621,"SH15T",else:if(n==3622,"SH20T",else:if(n==3624,"SH25T",else:"Unknown
+        model")))))))))))))))))))))))))
+
+        | fieldsAdd v11 = if(friendly_name == "Sungrow Protocol Version", concat("V", toString((n/16777216)%256), ".", toString((n/65536)%256),
+        ".", toString((n/256)%256), ".", toString(n%256)))
+
+        | fieldsAdd v12 = if(friendly_name == "Power factor", toString(round(raw, decimals:2)))
+
+        | fieldsAdd Value = coalesce(v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12, toString(n))
+
+        | fieldsAdd Sensor = if(friendly_name == "Active power limitation raw", "Active power limitation", else: if(friendly_name
+        == "APL shutdown at zero raw", "APL shutdown at zero", else: if(friendly_name == "Backup mode raw", "Backup mode",
+        else: if(friendly_name == "Battery forced charge discharge cmd raw", "Battery forced charge/discharge command", else:
+        if(friendly_name == "EMS mode selection raw", "EMS mode", else: if(friendly_name == "Export power limit mode raw",
+        "Export power limit", else: if(friendly_name == "Load adjustment mode enable raw", "Load adjustment", else: if(friendly_name
+        == "Load adjustment mode selection raw", "Load adjustment mode", else: if(friendly_name == "Power Flow Status", "Power
+        flow", else: if(friendly_name == "Running state raw", "Running state", else: if(friendly_name == "Sungrow device type
+        code", "Inverter model", else: if(friendly_name == "Sungrow Protocol Version", "Protocol version", else: if(friendly_name
+        == "Power factor", "Power factor", else: friendly_name)))))))))))))
+
+        | fieldsAdd Raw = if(friendly_name == "Power factor", "", else: toString(n))
+
+        | fields Sensor, Value, Raw
+
+        | sort Sensor asc
+
+        '
+      title: Inverter state (decoded)
+      type: data
+      visualization: table
+      visualizationSettings:
+        autoSelectVisualization: false
+    '11':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries val = avg(homeassistant_sensor_timestamp_seconds), by:{friendly_name}
+
+        | fieldsAdd time = toTimestamp(arrayLast(val) * 1000000000)
+
+        | fields friendly_name, time
+
+        | sort time asc
+
+        '
+      title: Sensor Timestamp (next sun events)
+      type: data
+      visualization: table
+      visualizationSettings:
+        autoSelectVisualization: false
+    '20':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_power_w), by:{friendly_name}
+
+        | filter in(friendly_name, array("Export power", "Export power raw", "Import power", "Meter active power", "Meter
+        phase A active power", "Meter phase B active power", "Meter phase C active power", "Total active power", "Reactive
+        power"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Power – Grid & meter (W)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '21':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_power_w), by:{friendly_name}
+
+        | filter in(friendly_name, array("MPPT1 power", "MPPT2 power", "Total DC power", "Load power"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Power – PV & house load (W)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '22':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_power_w), by:{friendly_name}
+
+        | filter in(friendly_name, array("Phase A power", "Phase B power", "Phase C power"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Power – Inverter phases (W)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '23':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_power_w), by:{friendly_name}
+
+        | filter in(friendly_name, array("BDC rated power", "Export power limit", "Export power limit max", "Export power
+        limit min", "Inverter rated output", "Battery max charge power", "Battery max discharge power", "Battery charging
+        start power", "Battery discharging start power", "Battery forced charge discharge power"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Power – Ratings & limits (W)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '24':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_power_w), by:{friendly_name}
+
+        | filter startsWith(friendly_name, "shelly")
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Power – Shelly plugs (W)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '25':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_energy_kwh), by:{friendly_name}
+
+        | filter in(friendly_name, array("Daily PV generation", "Daily PV generation & battery discharge", "Daily battery
+        charge", "Daily battery charge from PV", "Daily battery discharge"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Energy daily – PV & battery (kWh)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '26':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_energy_kwh), by:{friendly_name}
+
+        | filter in(friendly_name, array("Daily consumed energy", "Daily consumed energy (filtered)", "Daily direct energy
+        consumption", "Daily exported energy", "Daily exported energy from PV", "Daily imported energy"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Energy daily – Grid & consumption (kWh)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '27':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_energy_kwh), by:{friendly_name}
+
+        | filter in(friendly_name, array("Total PV generation", "Total PV generation & battery discharge", "Total battery
+        charge", "Total battery charge from PV", "Total battery discharge"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Energy total – PV & battery (kWh)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '28':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_energy_kwh), by:{friendly_name}
+
+        | filter in(friendly_name, array("Total consumed energy", "Total direct energy consumption", "Total exported energy",
+        "Total exported energy from PV", "Total imported energy"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Energy total – Grid & consumption (kWh)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '29':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_energy_kwh), by:{friendly_name}
+
+        | filter startsWith(friendly_name, "shelly")
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Energy – Shelly plugs (kWh)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '30':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_battery_percent), by:{friendly_name}
+
+        | filter in(friendly_name, array("Battery level", "Battery level (nominal)", "Battery max SoC", "Battery min SoC",
+        "Battery reserved SoC for backup"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Battery – charge level & limits (%)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '31':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_unit_percent), by:{friendly_name}
+
+        | filter in(friendly_name, array("Battery state of health", "Active power limitation ratio raw"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Battery – health & limit ratio (%)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '32':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_voltage_v), by:{friendly_name}
+
+        | filter in(friendly_name, array("Phase A voltage", "Phase B voltage", "Phase C voltage"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Voltage – Grid phases (V)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '33':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_voltage_v), by:{friendly_name}
+
+        | filter in(friendly_name, array("Battery voltage", "MPPT1 voltage", "MPPT2 voltage"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Voltage – Battery & PV (V)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '34':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_current_a), by:{friendly_name}
+
+        | filter in(friendly_name, array("Phase A current", "Phase B current", "Phase C current"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Current – Grid phases (A)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '35':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_current_a), by:{friendly_name}
+
+        | filter in(friendly_name, array("BMS max. charging current", "BMS max. discharging current", "MPPT1 current", "MPPT2
+        current"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Current – Battery BMS & PV (A)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '36':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_temperature_celsius), by:{friendly_name}
+
+        | filter in(friendly_name, array("Battery temperature", "Inverter temperature"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Temperatures (°C)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+    '37':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: 'timeseries v = avg(homeassistant_sensor_data_rate_kib_per_s), by:{friendly_name}
+
+        | filter in(friendly_name, array("OnHub Downloadgeschwindigkeit", "OnHub Uploadgeschwindigkeit"))
+
+        | filter arrayMax(v) != arrayMin(v)
+
+        '
+      title: Network data rate (KiB/s)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
+  variables: []
+  version: 21

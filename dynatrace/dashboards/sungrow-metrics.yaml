@@ -1,70 +1,51 @@
+id: 751301dc-6ef3-4af6-a9a0-efc7131d5ba1
+name: Sungrow metrics
+type: dashboard
 content:
   annotations: []
   importedWithCode: false
   layouts:
-    "0":
+    '0':
       h: 8
       w: 24
       x: 0
-      "y": 0
-    "4":
+      y: 0
+    '1':
       h: 6
       w: 24
       x: 0
-      "y": 8
-    "1":
-      h: 6
-      w: 24
-      x: 0
-      "y": 14
-    "2":
+      y: 14
+    '2':
       h: 4
       w: 12
       x: 0
-      "y": 20
-    "3":
+      y: 20
+    '3':
       h: 4
       w: 12
       x: 12
-      "y": 20
+      y: 20
+    '4':
+      h: 6
+      w: 24
+      x: 0
+      y: 8
   settings:
     defaultTimeframe:
       enabled: true
       value:
-        from: now()-24h
+        from: '@d'
         to: now()
   tiles:
-    "0":
+    '0':
       davis:
         davisVisualization:
           isAvailable: true
         enabled: false
-      query: |
-        timeseries {
-          pv_yield = avg(sungrow_total_dc_power),
-          grid = avg(sungrow_meter_active_power),
-          battery = avg(sungrow_battery_power),
-          load = avg(sungrow_load_power)
-        }
-      title: Power (W)
-      type: data
-      visualization: areaChart
-      visualizationSettings:
-        autoSelectVisualization: false
-        chartSettings:
-          legend:
-            position: bottom
-    "4":
-      davis:
-        davisVisualization:
-          isAvailable: true
-        enabled: false
-      query: |
-        timeseries {
-          temperature_C = avg(thermometer.temperature, filter: {model == "Nexus-TH"}),
-          humidity_pct = avg(thermometer.humidity, filter: {model == "Nexus-TH"})
-        }
-      title: Outdoor Temperature (°C) & Humidity (%)
+      query: "timeseries {\n  `Solar production` = avg(sungrow_total_dc_power),\n  `House consumption` = avg(sungrow_load_power),\n\
+        \  `Grid power` = avg(sungrow_meter_active_power),\n  `Battery power` = avg(sungrow_battery_power)\n}\n| fieldsAdd\
+        \ `Battery power` = `Battery power`[] * -1\n"
+      title: Power flow (W) — + export/charge, − import/discharge
       type: data
       visualization: lineChart
       visualizationSettings:
@@ -72,27 +53,31 @@ content:
         chartSettings:
           legend:
             position: bottom
-    "1":
+    '1':
       davis:
         davisVisualization:
           isAvailable: true
         enabled: false
-      query: |
-        timeseries avg(sungrow_battery_level)
+      query: 'timeseries avg(sungrow_battery_level)
+
+        '
       title: Battery Level (%)
       type: data
       visualization: lineChart
       visualizationSettings:
         autoSelectVisualization: false
-    "2":
+    '2':
       davis:
         davisVisualization:
           isAvailable: true
         enabled: false
-      query: |
-        timeseries soc = avg(sungrow_battery_level)
+      query: 'timeseries soc = avg(sungrow_battery_level)
+
         | fieldsAdd current = arrayLast(soc)
+
         | fields current
+
+        '
       title: Battery Level
       type: data
       visualization: singleValue
@@ -101,15 +86,18 @@ content:
         singleValue:
           label: '% charged'
           recordField: current
-    "3":
+    '3':
       davis:
         davisVisualization:
           isAvailable: true
         enabled: false
-      query: |
-        timeseries temp = avg(sungrow_inverter_temperature)
+      query: 'timeseries temp = avg(sungrow_inverter_temperature)
+
         | fieldsAdd current = arrayLast(temp)
+
         | fields current
+
+        '
       title: Inverter Temperature
       type: data
       visualization: singleValue
@@ -118,14 +106,20 @@ content:
         singleValue:
           label: °C
           recordField: current
+    '4':
+      davis:
+        davisVisualization:
+          isAvailable: true
+        enabled: false
+      query: "timeseries {\n  outdoor_temperature_C = avg(thermometer.temperature, filter: {model == \"AmbientWeather-TX8300\"\
+        }),\n  outdoor_humidity_pct = avg(thermometer.humidity, filter: {model == \"AmbientWeather-TX8300\"})\n}\n"
+      title: Outdoor Temperature (°C) & Humidity (%)
+      type: data
+      visualization: lineChart
+      visualizationSettings:
+        autoSelectVisualization: false
+        chartSettings:
+          legend:
+            position: bottom
   variables: []
   version: 21
-id: 751301dc-6ef3-4af6-a9a0-efc7131d5ba1
-isPrivate: true
-modificationInfo:
-  createdTime: 2026-05-23T20:39:49.078Z
-  lastModifiedTime: 2026-05-26T20:29:07.153Z
-name: Sungrow metrics
-owner: 777f6e4b-adba-4c42-b132-74a008ff71c9
-type: dashboard
-version: 6
